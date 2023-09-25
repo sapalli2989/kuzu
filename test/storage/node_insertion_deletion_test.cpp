@@ -82,3 +82,35 @@ TEST_F(NodeInsertionDeletionTests, DeleteAddMixedTest) {
     ASSERT_EQ(conn->query(query)->getNext()->getValue(0)->getValue<int64_t>(), 10005);
     ASSERT_EQ(readConn->query(query)->getNext()->getValue(0)->getValue<int64_t>(), 10005);
 }
+
+TEST_F(NodeInsertionDeletionTests, InsertManyNodesTestSmallUpdates) {
+    auto preparedStatement = conn->prepare("CREATE (:person {ID:$id});");
+    for (int64_t i = 0; i < BufferPoolConstants::PAGE_4KB_SIZE; i++) {
+        conn->beginWriteTransaction();
+        auto result =
+            conn->execute(preparedStatement.get(), std::make_pair(std::string("id"), 10001 + i));
+        ASSERT_TRUE(result->isSuccess()) << result->toString();
+        conn->commit();
+    }
+    auto result = conn->query("MATCH (a:person) WHERE a.ID >= 10001 RETURN COUNT(*);");
+    ASSERT_TRUE(result->hasNext());
+    auto tuple = result->getNext();
+    ASSERT_EQ(tuple->getValue(0)->getValue<int64_t>(), BufferPoolConstants::PAGE_4KB_SIZE);
+    ASSERT_FALSE(result->hasNext());
+}
+
+TEST_F(NodeInsertionDeletionTests, InsertManyNodesTest) {
+    auto preparedStatement = conn->prepare("CREATE (:person {ID:$id});");
+    conn->beginWriteTransaction();
+    for (int64_t i = 0; i < BufferPoolConstants::PAGE_4KB_SIZE; i++) {
+        auto result =
+            conn->execute(preparedStatement.get(), std::make_pair(std::string("id"), 10001 + i));
+        ASSERT_TRUE(result->isSuccess()) << result->toString();
+    }
+    conn->commit();
+    auto result = conn->query("MATCH (a:person) WHERE a.ID >= 10001 RETURN COUNT(*);");
+    ASSERT_TRUE(result->hasNext());
+    auto tuple = result->getNext();
+    ASSERT_EQ(tuple->getValue(0)->getValue<int64_t>(), BufferPoolConstants::PAGE_4KB_SIZE);
+    ASSERT_FALSE(result->hasNext());
+}
