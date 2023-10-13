@@ -33,6 +33,8 @@ VMRegion::VMRegion(PageSizeClass pageSizeClass, uint64_t maxRegionSize) : numFra
             "VirtualAlloc for size {} failed with error code {}: {}.", getMaxRegionSize(),
             GetLastError(), std::system_category().message(GetLastError())));
     }
+    frameCommitted = std::make_unique<std::atomic_uchar[]>(
+        maxNumFrameGroups * common::StorageConstants::PAGE_GROUP_SIZE);
 #else
     // Create a private anonymous mapping. The mapping is not shared with other processes and not
     // backed by any file, and its content are initialized to zero.
@@ -46,13 +48,19 @@ VMRegion::VMRegion(PageSizeClass pageSizeClass, uint64_t maxRegionSize) : numFra
 }
 
 #ifdef _WIN32
+static uint8_t NOT_COMMITTED = 0;
+static uint8_t MAYBE_COMMITTED = 1;
+static uint8_t COMMITTED = 2;
 uint8_t* VMRegion::getFrame(frame_idx_t frameIdx) {
-    auto result = VirtualAlloc(
-        region + ((std::uint64_t)frameIdx * frameSize), frameSize, MEM_COMMIT, PAGE_READWRITE);
-    if (result == NULL) {
-        throw BufferManagerException(StringUtils::string_format(
-            "VirtualAlloc MEM_COMMIT failed with error code {}: {}.", getMaxRegionSize(),
-            GetLastError(), std::system_category().message(GetLastError())));
+    if (frameCommitted[frameIdx] != COMMITTED) {
+        auto result = VirtualAlloc(
+            region + ((std::uint64_t)frameIdx * frameSize), frameSize, MEM_COMMIT, PAGE_READWRITE);
+        if (result == NULL) {
+            throw BufferManagerException(StringUtils::string_format(
+                "VirtualAlloc MEM_COMMIT failed with error code {}: {}.", getMaxRegionSize(),
+                GetLastError(), std::system_category().message(GetLastError())));
+        }
+        frameCommitted[frameIdx] = COMMITTED;
     }
     return region + ((std::uint64_t)frameIdx * frameSize);
 }
@@ -71,11 +79,32 @@ void VMRegion::releaseFrame(frame_idx_t frameIdx) {
     // TODO: VirtualAlloc(..., MEM_RESET, ...) may be faster
     // See https://arvid.io/2018/04/02/memory-mapping-on-windows/#1
     // Not sure what the differences are
-    if (!VirtualFree(getFrame(frameIdx), frameSize, MEM_DECOMMIT)) {
-        auto code = GetLastError();
-        throw BufferManagerException(StringUtils::string_format(
-            "Releasing physical memory associated with a frame failed with error code {}: {}.",
-            code, systemErrMessage(code)));
+
+    // Exception handling deals with the case where we release while another thread is reading
+    // We need to use the atomics to make sure that we don't repeatedly skip committing released
+    // memory if there was a data race.
+    // To achieve this, we always set the state to MAYBE_COMMITTED before releasing.
+    //
+    // If another thread commits while we are releasing, we can skip marking it as uncommitted and
+    // instead set it to maybe_committed.
+    // When reading, we will always try to commit unless it is COMMITTED, so if a data race occurs,
+    // leaving the state as MAYBE_COMMITED, we will never reach a state where reading from the frame
+    // is impossible.
+    auto expected = COMMITTED;
+    if (frameCommitted[frameIdx].compare_exchange_strong(expected, MAYBE_COMMITTED)) {
+        if (!VirtualFree(getFrame(frameIdx), frameSize, MEM_DECOMMIT)) {
+            auto code = GetLastError();
+            throw BufferManagerException(StringUtils::string_format(
+                "Releasing physical memory associated with a frame failed with error code {}: {}.",
+                code, systemErrMessage(code)));
+        }
+        expected = MAYBE_COMMITTED;
+        if (!frameCommitted[frameIdx].compare_exchange_strong(expected, NOT_COMMITTED)) {
+            // If it was set to committed while we were releasing, set it to MAYBE_COMMITTED instead
+            // because we don't know whether the release occurred before or after the commit, so we
+            // should attempt to commit before accessing next time.
+            frameCommitted[frameIdx] = MAYBE_COMMITTED;
+        }
     }
 
 #else

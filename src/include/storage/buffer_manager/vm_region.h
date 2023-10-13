@@ -48,6 +48,9 @@ private:
     uint32_t frameSize;
     uint64_t numFrameGroups;
     uint64_t maxNumFrameGroups;
+#ifdef _WIN32
+    std::unique_ptr<std::atomic_uchar[]> frameCommitted;
+#endif
 };
 
 } // namespace storage
