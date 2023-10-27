@@ -99,7 +99,7 @@ std::unique_ptr<BoundReadingClause> Binder::bindUnwindClause(const ReadingClause
 std::unique_ptr<BoundReadingClause> Binder::bindInQueryCall(const ReadingClause& readingClause) {
     auto& call = reinterpret_cast<const InQueryCallClause&>(readingClause);
     auto tableFunctionDefinition =
-        catalog.getBuiltInTableFunction()->mathTableFunction(call.getFuncName());
+        catalog.getBuiltInFunctions()->mathTableFunction(call.getFuncName());
     auto inputValues = std::vector<Value>{};
     for (auto& parameter : call.getParameters()) {
         auto boundExpr = expressionBinder.bindLiteralExpression(*parameter);

@@ -38,6 +38,7 @@ bool isExpressionSubquery(ExpressionType type) {
     return EXISTENTIAL_SUBQUERY == type;
 }
 
+// LCOV_EXCL_START
 std::string expressionTypeToString(ExpressionType type) {
     switch (type) {
     case OR:
@@ -76,8 +77,8 @@ std::string expressionTypeToString(ExpressionType type) {
         return "PATH";
     case PARAMETER:
         return "PARAMETER";
-    case FUNCTION:
-        return "FUNCTION";
+    case SCALAR_FUNCTION:
+        return "SCALAR_FUNCTION";
     case AGGREGATE_FUNCTION:
         return "AGGREGATE_FUNCTION";
     case EXISTENTIAL_SUBQUERY:
@@ -86,6 +87,7 @@ std::string expressionTypeToString(ExpressionType type) {
         throw NotImplementedException("Cannot convert expression type to string");
     }
 }
+// LCOV_EXCL_STOP
 
 } // namespace common
 } // namespace kuzu

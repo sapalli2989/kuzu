@@ -38,7 +38,7 @@ static bool canEvaluateAsFunction(ExpressionType expressionType) {
     case ExpressionType::LESS_THAN_EQUALS:
     case ExpressionType::IS_NULL:
     case ExpressionType::IS_NOT_NULL:
-    case ExpressionType::FUNCTION:
+    case ExpressionType::SCALAR_FUNCTION:
         return true;
     default:
         return false;

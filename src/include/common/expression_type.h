@@ -258,7 +258,7 @@ enum ExpressionType : uint8_t {
 
     PARAMETER = 100,
 
-    FUNCTION = 110,
+    SCALAR_FUNCTION = 110,
 
     AGGREGATE_FUNCTION = 130,
 

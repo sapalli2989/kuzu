@@ -60,7 +60,7 @@ std::unique_ptr<ParsedExpression> ParsedExpression::deserialize(Deserializer& de
     case ExpressionType::CASE_ELSE: {
         parsedExpression = ParsedCaseExpression::deserialize(deserializer);
     } break;
-    case ExpressionType::FUNCTION: {
+    case ExpressionType::SCALAR_FUNCTION: {
         parsedExpression = ParsedFunctionExpression::deserialize(deserializer);
     } break;
     case ExpressionType::LITERAL: {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "arithmetic_functions.h"
-#include "function/vector_functions.h"
+#include "function/scalar_function.h"
 
 namespace kuzu {
 namespace function {
@@ -9,36 +9,36 @@ namespace function {
 class VectorArithmeticFunction : public VectorFunction {
 public:
     template<typename FUNC>
-    static std::unique_ptr<VectorFunctionDefinition> getUnaryDefinition(
+    static std::unique_ptr<ScalarFunction> getUnaryDefinition(
         std::string name, common::LogicalTypeID operandTypeID) {
         function::scalar_exec_func execFunc;
         getUnaryExecFunc<FUNC>(operandTypeID, execFunc);
-        return std::make_unique<VectorFunctionDefinition>(std::move(name),
+        return std::make_unique<ScalarFunction>(std::move(name),
             std::vector<common::LogicalTypeID>{operandTypeID}, operandTypeID, execFunc);
     }
 
     template<typename FUNC, typename OPERAND_TYPE, typename RETURN_TYPE = OPERAND_TYPE>
-    static std::unique_ptr<VectorFunctionDefinition> getUnaryDefinition(
+    static std::unique_ptr<ScalarFunction> getUnaryDefinition(
         std::string name, common::LogicalTypeID operandTypeID, common::LogicalTypeID resultTypeID) {
-        return std::make_unique<VectorFunctionDefinition>(std::move(name),
+        return std::make_unique<ScalarFunction>(std::move(name),
             std::vector<common::LogicalTypeID>{operandTypeID}, resultTypeID,
             UnaryExecFunction<OPERAND_TYPE, RETURN_TYPE, FUNC>);
     }
 
     template<typename FUNC>
-    static inline std::unique_ptr<VectorFunctionDefinition> getBinaryDefinition(
+    static inline std::unique_ptr<ScalarFunction> getBinaryDefinition(
         std::string name, common::LogicalTypeID operandTypeID) {
         function::scalar_exec_func execFunc;
         getBinaryExecFunc<FUNC>(operandTypeID, execFunc);
-        return std::make_unique<VectorFunctionDefinition>(std::move(name),
+        return std::make_unique<ScalarFunction>(std::move(name),
             std::vector<common::LogicalTypeID>{operandTypeID, operandTypeID}, operandTypeID,
             execFunc);
     }
 
     template<typename FUNC, typename OPERAND_TYPE, typename RETURN_TYPE = OPERAND_TYPE>
-    static inline std::unique_ptr<VectorFunctionDefinition> getBinaryDefinition(
+    static inline std::unique_ptr<ScalarFunction> getBinaryDefinition(
         std::string name, common::LogicalTypeID operandTypeID, common::LogicalTypeID resultTypeID) {
-        return std::make_unique<VectorFunctionDefinition>(std::move(name),
+        return std::make_unique<ScalarFunction>(std::move(name),
             std::vector<common::LogicalTypeID>{operandTypeID, operandTypeID}, resultTypeID,
             BinaryExecFunction<OPERAND_TYPE, OPERAND_TYPE, RETURN_TYPE, FUNC>);
     }
@@ -159,151 +159,151 @@ private:
 };
 
 struct AddVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct SubtractVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct MultiplyVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct DivideVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct ModuloVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct PowerVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct AbsVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct AcosVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct AsinVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct AtanVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct Atan2VectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct BitwiseXorVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct BitwiseAndVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct BitwiseOrVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct BitShiftLeftVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct BitShiftRightVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CbrtVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CeilVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CosVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CotVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct DegreesVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct EvenVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct FactorialVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct FloorVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct GammaVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct LgammaVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct LnVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct LogVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct Log2VectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct NegateVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct PiVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct RadiansVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct RoundVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct SinVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct SignVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct SqrtVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct TanVectorFunction : public VectorArithmeticFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 } // namespace function

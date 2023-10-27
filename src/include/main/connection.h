@@ -165,8 +165,7 @@ private:
     std::unique_ptr<QueryResult> executeAndAutoCommitIfNecessaryNoLock(
         PreparedStatement* preparedStatement, uint32_t planIdx = 0u);
 
-    KUZU_API void addScalarFunction(
-        std::string name, function::vector_function_definitions definitions);
+    KUZU_API void addScalarFunction(std::string name, function::function_set definitions);
 
     void checkPreparedStatementAccessMode(PreparedStatement* preparedStatement);
 

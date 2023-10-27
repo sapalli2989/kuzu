@@ -2,7 +2,7 @@
 
 #include "function/cast/functions/cast_functions.h"
 #include "function/cast/functions/cast_string_to_functions.h"
-#include "function/vector_functions.h"
+#include "function/scalar_function.h"
 
 namespace kuzu {
 namespace function {
@@ -24,12 +24,12 @@ public:
 
 protected:
     template<typename TARGET_TYPE, typename FUNC>
-    inline static std::unique_ptr<VectorFunctionDefinition> bindNumericCastVectorFunction(
+    inline static std::unique_ptr<ScalarFunction> bindNumericCastVectorFunction(
         const std::string& funcName, common::LogicalTypeID sourceTypeID,
         common::LogicalTypeID targetTypeID) {
         scalar_exec_func func;
         bindImplicitNumericalCastFunc<TARGET_TYPE, FUNC>(sourceTypeID, func);
-        return std::make_unique<VectorFunctionDefinition>(
+        return std::make_unique<ScalarFunction>(
             funcName, std::vector<common::LogicalTypeID>{sourceTypeID}, targetTypeID, func);
     }
 
@@ -90,86 +90,86 @@ protected:
     }
 
     template<typename TARGET_TYPE>
-    inline static std::unique_ptr<VectorFunctionDefinition> bindCastStringToVectorFunction(
+    inline static std::unique_ptr<ScalarFunction> bindCastStringToVectorFunction(
         const std::string& funcName, common::LogicalTypeID targetTypeID) {
-        return std::make_unique<VectorFunctionDefinition>(funcName,
+        return std::make_unique<ScalarFunction>(funcName,
             std::vector<common::LogicalTypeID>{common::LogicalTypeID::STRING}, targetTypeID,
             UnaryStringExecFunction<common::ku_string_t, TARGET_TYPE, CastStringToTypes>);
     }
 };
 
 struct CastToDateVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToTimestampVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToIntervalVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToStringVectorFunction : public VectorCastFunction {
     static void getUnaryCastToStringExecFunction(
         common::LogicalTypeID typeID, scalar_exec_func& func);
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToBlobVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToBoolVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToDoubleVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToFloatVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToSerialVectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToInt128VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToInt64VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToInt32VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToInt16VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToInt8VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToUInt64VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToUInt32VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToUInt16VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct CastToUInt8VectorFunction : public VectorCastFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 } // namespace function

@@ -14,7 +14,7 @@ std::vector<ParsedExpression*> ParsedExpressionChildrenVisitor::collectChildren(
     case ExpressionType::CASE_ELSE: {
         return collectCaseChildren(expression);
     }
-    case ExpressionType::FUNCTION:
+    case ExpressionType::SCALAR_FUNCTION:
     case ExpressionType::LITERAL:
     case ExpressionType::PROPERTY:
     case ExpressionType::VARIABLE: {
@@ -37,7 +37,7 @@ void ParsedExpressionChildrenVisitor::setChild(kuzu::parser::ParsedExpression& e
     case ExpressionType::CASE_ELSE: {
         setCaseChild(expression, idx, std::move(expressionToSet));
     } break;
-    case ExpressionType::FUNCTION:
+    case ExpressionType::SCALAR_FUNCTION:
     case ExpressionType::LITERAL:
     case ExpressionType::PROPERTY:
     case ExpressionType::VARIABLE: {

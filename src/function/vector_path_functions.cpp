@@ -11,48 +11,48 @@ using namespace kuzu::common;
 namespace kuzu {
 namespace function {
 
-vector_function_definitions NodesVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(NODES_FUNC_NAME,
+function_set NodesVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(NODES_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::RECURSIVE_REL}, LogicalTypeID::ANY, nullptr,
-        nullptr, StructExtractVectorFunctions::compileFunc, bindFunc, false /* isVarLength */));
+        nullptr, StructExtractFunctions::compileFunc, bindFunc, false /* isVarLength */));
     return definitions;
 }
 
 std::unique_ptr<FunctionBindData> NodesVectorFunction::bindFunc(
-    const binder::expression_vector& arguments, FunctionDefinition* /*definition*/) {
+    const binder::expression_vector& arguments, Function* /*definition*/) {
     auto structType = arguments[0]->getDataType();
     auto fieldIdx = StructType::getFieldIdx(&structType, InternalKeyword::NODES);
     return std::make_unique<StructExtractBindData>(
         *(StructType::getFieldTypes(&structType))[fieldIdx], fieldIdx);
 }
 
-vector_function_definitions RelsVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(RELS_FUNC_NAME,
+function_set RelsVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(RELS_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::RECURSIVE_REL}, LogicalTypeID::ANY, nullptr,
-        nullptr, StructExtractVectorFunctions::compileFunc, bindFunc, false /* isVarLength */));
+        nullptr, StructExtractFunctions::compileFunc, bindFunc, false /* isVarLength */));
     return definitions;
 }
 
 std::unique_ptr<FunctionBindData> RelsVectorFunction::bindFunc(
-    const binder::expression_vector& arguments, FunctionDefinition* /*definition*/) {
+    const binder::expression_vector& arguments, Function* /*definition*/) {
     auto structType = arguments[0]->getDataType();
     auto fieldIdx = StructType::getFieldIdx(&structType, InternalKeyword::RELS);
     return std::make_unique<StructExtractBindData>(
         *(StructType::getFieldTypes(&structType))[fieldIdx], fieldIdx);
 }
 
-vector_function_definitions PropertiesVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(PROPERTIES_FUNC_NAME,
+function_set PropertiesVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(PROPERTIES_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::VAR_LIST, LogicalTypeID::STRING},
         LogicalTypeID::ANY, execFunc, nullptr, compileFunc, bindFunc, false /* isVarLength */));
     return definitions;
 }
 
 std::unique_ptr<FunctionBindData> PropertiesVectorFunction::bindFunc(
-    const binder::expression_vector& arguments, FunctionDefinition* /*definition*/) {
+    const binder::expression_vector& arguments, Function* /*definition*/) {
     if (arguments[1]->expressionType != ExpressionType::LITERAL) {
         throw BinderException(stringFormat(
             "Expected literal input as the second argument for {}().", PROPERTIES_FUNC_NAME));
@@ -115,9 +115,9 @@ void PropertiesVectorFunction::execFunc(
     }
 }
 
-vector_function_definitions IsTrailVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(IS_TRAIL_FUNC_NAME,
+function_set IsTrailVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(IS_TRAIL_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::RECURSIVE_REL}, LogicalTypeID::BOOL, execFunc,
         selectFunc, nullptr, nullptr, false /* isVarLength */));
     return definitions;
@@ -133,9 +133,9 @@ bool IsTrailVectorFunction::selectFunc(
     return UnaryPathExecutor::selectRelIDs(*parameters[0], selectionVector);
 }
 
-vector_function_definitions IsACyclicVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(IS_ACYCLIC_FUNC_NAME,
+function_set IsACyclicVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(IS_ACYCLIC_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::RECURSIVE_REL}, LogicalTypeID::BOOL, execFunc,
         selectFunc, nullptr, nullptr, false /* isVarLength */));
     return definitions;

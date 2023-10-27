@@ -121,18 +121,18 @@ void Reverse::operation(common::ku_string_t& input, common::ku_string_t& result,
     }
 }
 
-vector_function_definitions ArrayExtractVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(ARRAY_EXTRACT_FUNC_NAME,
+function_set ArrayExtractFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(ARRAY_EXTRACT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::INT64},
         LogicalTypeID::STRING, BinaryExecFunction<ku_string_t, int64_t, ku_string_t, ArrayExtract>,
         false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions ConcatVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(CONCAT_FUNC_NAME,
+function_set ConcatFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(CONCAT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::STRING,
         BinaryStringExecFunction<ku_string_t, ku_string_t, ku_string_t, Concat>,
@@ -140,36 +140,36 @@ vector_function_definitions ConcatVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions ContainsVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(CONTAINS_FUNC_NAME,
+function_set ContainsFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(CONTAINS_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::BOOL, BinaryExecFunction<ku_string_t, ku_string_t, uint8_t, Contains>,
         BinarySelectFunction<ku_string_t, ku_string_t, Contains>, false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions EndsWithVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(ENDS_WITH_FUNC_NAME,
+function_set EndsWithFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(ENDS_WITH_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::BOOL, BinaryExecFunction<ku_string_t, ku_string_t, uint8_t, EndsWith>,
         BinarySelectFunction<ku_string_t, ku_string_t, EndsWith>, false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions LeftVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(LEFT_FUNC_NAME,
+function_set LeftFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(LEFT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::INT64},
         LogicalTypeID::STRING, BinaryStringExecFunction<ku_string_t, int64_t, ku_string_t, Left>,
         false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions LpadVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(LPAD_FUNC_NAME,
+function_set LpadFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(LPAD_FUNC_NAME,
         std::vector<LogicalTypeID>{
             LogicalTypeID::STRING, LogicalTypeID::INT64, LogicalTypeID::STRING},
         LogicalTypeID::STRING,
@@ -178,27 +178,27 @@ vector_function_definitions LpadVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions RepeatVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REPEAT_FUNC_NAME,
+function_set RepeatVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(REPEAT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::INT64},
         LogicalTypeID::STRING, BinaryStringExecFunction<ku_string_t, int64_t, ku_string_t, Repeat>,
         false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions RightVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(RIGHT_FUNC_NAME,
+function_set RightVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(RIGHT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::INT64},
         LogicalTypeID::STRING, BinaryStringExecFunction<ku_string_t, int64_t, ku_string_t, Right>,
         false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions RpadVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(RPAD_FUNC_NAME,
+function_set RpadVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(RPAD_FUNC_NAME,
         std::vector<LogicalTypeID>{
             LogicalTypeID::STRING, LogicalTypeID::INT64, LogicalTypeID::STRING},
         LogicalTypeID::STRING,
@@ -207,18 +207,18 @@ vector_function_definitions RpadVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions StartsWithVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(STARTS_WITH_FUNC_NAME,
+function_set StartsWithVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(STARTS_WITH_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::BOOL, BinaryExecFunction<ku_string_t, ku_string_t, uint8_t, StartsWith>,
         BinarySelectFunction<ku_string_t, ku_string_t, StartsWith>, false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions SubStrVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(SUBSTRING_FUNC_NAME,
+function_set SubStrVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(SUBSTRING_FUNC_NAME,
         std::vector<LogicalTypeID>{
             LogicalTypeID::STRING, LogicalTypeID::INT64, LogicalTypeID::INT64},
         LogicalTypeID::STRING,
@@ -227,18 +227,18 @@ vector_function_definitions SubStrVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions RegexpFullMatchVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_FULL_MATCH_FUNC_NAME,
+function_set RegexpFullMatchVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_FULL_MATCH_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::BOOL, BinaryExecFunction<ku_string_t, ku_string_t, uint8_t, RegexpFullMatch>,
         BinarySelectFunction<ku_string_t, ku_string_t, RegexpFullMatch>, false /* isVarLength */));
     return definitions;
 }
 
-vector_function_definitions RegexpMatchesVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_MATCHES_FUNC_NAME,
+function_set RegexpMatchesVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_MATCHES_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::BOOL,
         VectorFunction::BinaryExecFunction<ku_string_t, ku_string_t, uint8_t, RegexpMatches>,
@@ -247,11 +247,11 @@ vector_function_definitions RegexpMatchesVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions RegexpReplaceVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
+function_set RegexpReplaceVectorFunction::getFunctionSet() {
+    function_set definitions;
     // Todo: Implement a function with modifiers
     //  regexp_replace(string, regex, replacement, modifiers)
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_REPLACE_FUNC_NAME,
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_REPLACE_FUNC_NAME,
         std::vector<LogicalTypeID>{
             LogicalTypeID::STRING, LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::STRING,
@@ -261,14 +261,14 @@ vector_function_definitions RegexpReplaceVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions RegexpExtractVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_EXTRACT_FUNC_NAME,
+function_set RegexpExtractVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_EXTRACT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::STRING,
         BinaryStringExecFunction<ku_string_t, ku_string_t, ku_string_t, RegexpExtract>,
         false /* isVarLength */));
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_EXTRACT_FUNC_NAME,
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_EXTRACT_FUNC_NAME,
         std::vector<LogicalTypeID>{
             LogicalTypeID::STRING, LogicalTypeID::STRING, LogicalTypeID::INT64},
         LogicalTypeID::STRING,
@@ -277,14 +277,14 @@ vector_function_definitions RegexpExtractVectorFunction::getDefinitions() {
     return definitions;
 }
 
-vector_function_definitions RegexpExtractAllVectorFunction::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_EXTRACT_FUNC_NAME,
+function_set RegexpExtractAllVectorFunction::getFunctionSet() {
+    function_set definitions;
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_EXTRACT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::STRING, LogicalTypeID::STRING},
         LogicalTypeID::VAR_LIST,
         BinaryStringExecFunction<ku_string_t, ku_string_t, list_entry_t, RegexpExtractAll>, nullptr,
         bindFunc, false /* isVarLength */));
-    definitions.emplace_back(make_unique<VectorFunctionDefinition>(REGEXP_EXTRACT_FUNC_NAME,
+    definitions.emplace_back(make_unique<ScalarFunction>(REGEXP_EXTRACT_FUNC_NAME,
         std::vector<LogicalTypeID>{
             LogicalTypeID::STRING, LogicalTypeID::STRING, LogicalTypeID::INT64},
         LogicalTypeID::VAR_LIST,
@@ -295,7 +295,7 @@ vector_function_definitions RegexpExtractAllVectorFunction::getDefinitions() {
 }
 
 std::unique_ptr<FunctionBindData> RegexpExtractAllVectorFunction::bindFunc(
-    const binder::expression_vector& /*arguments*/, FunctionDefinition* /*definition*/) {
+    const binder::expression_vector& /*arguments*/, Function* /*definition*/) {
     return std::make_unique<FunctionBindData>(LogicalType(LogicalTypeID::VAR_LIST,
         std::make_unique<VarListTypeInfo>(std::make_unique<LogicalType>(LogicalTypeID::STRING))));
 }

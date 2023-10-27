@@ -1,6 +1,6 @@
 #pragma once
 
-#include "function/vector_functions.h"
+#include "function/scalar_function.h"
 
 namespace kuzu {
 namespace function {
@@ -140,8 +140,8 @@ struct VectorListFunction : public VectorFunction {
 
     template<typename OPERATION>
     static std::unique_ptr<FunctionBindData> bindFuncListAggre(
-        const binder::expression_vector& arguments, FunctionDefinition* definition) {
-        auto vectorFunctionDefinition = reinterpret_cast<VectorFunctionDefinition*>(definition);
+        const binder::expression_vector& arguments, Function* definition) {
+        auto vectorFunctionDefinition = reinterpret_cast<ScalarFunction*>(definition);
         auto resultType = common::VarListType::getChildType(&arguments[0]->dataType);
         switch (resultType->getLogicalTypeID()) {
         case common::LogicalTypeID::SERIAL:
@@ -198,105 +198,105 @@ struct VectorListFunction : public VectorFunction {
 };
 
 struct ListCreationVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
     static void execFunc(const std::vector<std::shared_ptr<common::ValueVector>>& parameters,
         common::ValueVector& result);
 };
 
 struct ListRangeVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct SizeVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct ListExtractVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListConcatVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListAppendVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListPrependVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListPositionVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListContainsVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListSliceVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListSortVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
     template<typename T>
     static void getExecFunction(const binder::expression_vector& arguments, scalar_exec_func& func);
 };
 
 struct ListReverseSortVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
     template<typename T>
     static void getExecFunction(const binder::expression_vector& arguments, scalar_exec_func& func);
 };
 
 struct ListSumVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct ListProductVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
 };
 
 struct ListDistinctVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListUniqueVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 struct ListAnyValueVectorFunction : public VectorListFunction {
-    static vector_function_definitions getDefinitions();
+    static function_set getFunctionSet();
     static std::unique_ptr<FunctionBindData> bindFunc(
-        const binder::expression_vector& arguments, FunctionDefinition* definition);
+        const binder::expression_vector& arguments, Function* definition);
 };
 
 } // namespace function

@@ -11,19 +11,18 @@ using namespace kuzu::common;
 namespace kuzu {
 namespace function {
 
-vector_function_definitions MapCreationVectorFunctions::getDefinitions() {
+function_set MapCreationFunctions::getFunctionSet() {
     auto execFunc = VectorListFunction::BinaryExecListStructFunction<list_entry_t, list_entry_t,
         list_entry_t, MapCreation>;
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(MAP_CREATION_FUNC_NAME,
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(MAP_CREATION_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::VAR_LIST, LogicalTypeID::VAR_LIST},
         LogicalTypeID::MAP, execFunc, nullptr, bindFunc, false /* isVarLength */));
     return definitions;
 }
 
-std::unique_ptr<FunctionBindData> MapCreationVectorFunctions::bindFunc(
-    const binder::expression_vector& arguments,
-    kuzu::function::FunctionDefinition* /*definition*/) {
+std::unique_ptr<FunctionBindData> MapCreationFunctions::bindFunc(
+    const binder::expression_vector& arguments, kuzu::function::Function* /*definition*/) {
     auto keyType = VarListType::getChildType(&arguments[0]->dataType);
     auto valueType = VarListType::getChildType(&arguments[1]->dataType);
     std::vector<std::unique_ptr<StructField>> structFields;
@@ -38,9 +37,9 @@ std::unique_ptr<FunctionBindData> MapCreationVectorFunctions::bindFunc(
     return std::make_unique<FunctionBindData>(resultType);
 }
 
-vector_function_definitions MapExtractVectorFunctions::getDefinitions() {
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(MAP_EXTRACT_FUNC_NAME,
+function_set MapExtractFunctions::getFunctionSet() {
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(MAP_EXTRACT_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::MAP, LogicalTypeID::ANY}, LogicalTypeID::VAR_LIST,
         nullptr, nullptr, bindFunc, false /* isVarLength */));
     return definitions;
@@ -54,10 +53,10 @@ static void validateKeyType(std::shared_ptr<binder::Expression> mapExpression,
     }
 }
 
-std::unique_ptr<FunctionBindData> MapExtractVectorFunctions::bindFunc(
-    const binder::expression_vector& arguments, kuzu::function::FunctionDefinition* definition) {
+std::unique_ptr<FunctionBindData> MapExtractFunctions::bindFunc(
+    const binder::expression_vector& arguments, kuzu::function::Function* definition) {
     validateKeyType(arguments[0], arguments[1]);
-    auto vectorFunctionDefinition = reinterpret_cast<VectorFunctionDefinition*>(definition);
+    auto vectorFunctionDefinition = reinterpret_cast<ScalarFunction*>(definition);
     vectorFunctionDefinition->execFunc =
         VectorListFunction::getBinaryListExecFuncSwitchRight<MapExtract, list_entry_t>(
             arguments[1]->getDataType());
@@ -67,38 +66,36 @@ std::unique_ptr<FunctionBindData> MapExtractVectorFunctions::bindFunc(
         LogicalType(LogicalTypeID::VAR_LIST, std::move(returnListInfo)));
 }
 
-vector_function_definitions MapKeysVectorFunctions::getDefinitions() {
+function_set MapKeysFunctions::getFunctionSet() {
     auto execFunc =
         VectorListFunction::UnaryExecListStructFunction<list_entry_t, list_entry_t, MapKeys>;
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(MAP_KEYS_FUNC_NAME,
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(MAP_KEYS_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::MAP}, LogicalTypeID::VAR_LIST, execFunc, nullptr,
         bindFunc, false /* isVarLength */));
     return definitions;
 }
 
-std::unique_ptr<FunctionBindData> MapKeysVectorFunctions::bindFunc(
-    const binder::expression_vector& arguments,
-    kuzu::function::FunctionDefinition* /*definition*/) {
+std::unique_ptr<FunctionBindData> MapKeysFunctions::bindFunc(
+    const binder::expression_vector& arguments, kuzu::function::Function* /*definition*/) {
     auto returnListInfo = std::make_unique<VarListTypeInfo>(
         std::make_unique<LogicalType>(*MapType::getKeyType(&arguments[0]->dataType)));
     return std::make_unique<FunctionBindData>(
         LogicalType(LogicalTypeID::VAR_LIST, std::move(returnListInfo)));
 }
 
-vector_function_definitions MapValuesVectorFunctions::getDefinitions() {
+function_set MapValuesFunctions::getFunctionSet() {
     auto execFunc =
         VectorListFunction::UnaryExecListStructFunction<list_entry_t, list_entry_t, MapValues>;
-    vector_function_definitions definitions;
-    definitions.push_back(make_unique<VectorFunctionDefinition>(MAP_VALUES_FUNC_NAME,
+    function_set definitions;
+    definitions.push_back(make_unique<ScalarFunction>(MAP_VALUES_FUNC_NAME,
         std::vector<LogicalTypeID>{LogicalTypeID::MAP}, LogicalTypeID::VAR_LIST, execFunc, nullptr,
         bindFunc, false /* isVarLength */));
     return definitions;
 }
 
-std::unique_ptr<FunctionBindData> MapValuesVectorFunctions::bindFunc(
-    const binder::expression_vector& arguments,
-    kuzu::function::FunctionDefinition* /*definition*/) {
+std::unique_ptr<FunctionBindData> MapValuesFunctions::bindFunc(
+    const binder::expression_vector& arguments, kuzu::function::Function* /*definition*/) {
     auto returnListInfo = std::make_unique<VarListTypeInfo>(
         std::make_unique<LogicalType>(*MapType::getValueType(&arguments[0]->dataType)));
     return std::make_unique<FunctionBindData>(

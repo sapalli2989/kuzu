@@ -26,7 +26,7 @@ std::shared_ptr<Expression> ExpressionBinder::bindExpression(
         expression = bindComparisonExpression(parsedExpression);
     } else if (isExpressionNullOperator(expressionType)) {
         expression = bindNullOperatorExpression(parsedExpression);
-    } else if (FUNCTION == expressionType) {
+    } else if (SCALAR_FUNCTION == expressionType) {
         expression = bindFunctionExpression(parsedExpression);
     } else if (PROPERTY == expressionType) {
         expression = bindPropertyExpression(parsedExpression);
@@ -114,7 +114,7 @@ std::shared_ptr<Expression> ExpressionBinder::implicitCast(
         VectorCastFunction::bindImplicitCastFunc(
             expression->dataType.getLogicalTypeID(), targetType.getLogicalTypeID(), execFunc);
         auto uniqueName = ScalarFunctionExpression::getUniqueName(functionName, children);
-        return std::make_shared<ScalarFunctionExpression>(functionName, FUNCTION,
+        return std::make_shared<ScalarFunctionExpression>(functionName, SCALAR_FUNCTION,
             std::move(bindData), std::move(children), execFunc, nullptr /* selectFunc */,
             std::move(uniqueName));
     } else {
