@@ -10,20 +10,6 @@ using namespace kuzu::common;
 namespace kuzu {
 namespace storage {
 
-void VarListDataColumnChunk::reset() const {
-    dataColumnChunk->resetToEmpty();
-}
-
-void VarListDataColumnChunk::resizeBuffer(uint64_t numValues) {
-    if (numValues <= capacity) {
-        return;
-    }
-    while (capacity < numValues) {
-        capacity *= VAR_LIST_RESIZE_RATIO;
-    }
-    dataColumnChunk->resize(capacity);
-}
-
 VarListColumnChunk::VarListColumnChunk(LogicalType dataType, bool enableCompression)
     : ColumnChunk{std::move(dataType), enableCompression, true /* hasNullChunk */},
       varListDataColumnChunk{ColumnChunkFactory::createColumnChunk(
@@ -36,30 +22,29 @@ void VarListColumnChunk::append(ColumnChunk* other, offset_t startPosInOtherChun
     nullChunk->append(
         other->getNullChunk(), startPosInOtherChunk, startPosInChunk, numValuesToAppend);
     auto otherListChunk = reinterpret_cast<VarListColumnChunk*>(other);
-    auto offsetInDataChunkToAppend = varListDataColumnChunk.getNumValues();
+    auto offsetInDataChunkToAppend = varListDataColumnChunk->getNumValues();
     for (auto i = 0u; i < numValuesToAppend; i++) {
         offsetInDataChunkToAppend += otherListChunk->getListLen(startPosInOtherChunk + i);
         setValue(offsetInDataChunkToAppend, startPosInChunk + i);
     }
     auto startOffset = otherListChunk->getListOffset(startPosInOtherChunk);
     auto endOffset = otherListChunk->getListOffset(startPosInOtherChunk + numValuesToAppend);
-    varListDataColumnChunk.resizeBuffer(offsetInDataChunkToAppend);
-    varListDataColumnChunk.dataColumnChunk->append(
-        otherListChunk->varListDataColumnChunk.dataColumnChunk.get(), startOffset,
-        varListDataColumnChunk.getNumValues(), endOffset - startOffset);
+    resizeDataChunkForValues(offsetInDataChunkToAppend);
+    varListDataColumnChunk->append(otherListChunk->varListDataColumnChunk.get(), startOffset,
+        varListDataColumnChunk->getNumValues(), endOffset - startOffset);
     numValues += numValuesToAppend;
 }
 
 void VarListColumnChunk::write(const Value& listVal, uint64_t posToWrite) {
     assert(listVal.getDataType()->getPhysicalType() == PhysicalTypeID::VAR_LIST);
     auto numValuesInList = NestedVal::getChildrenSize(&listVal);
-    varListDataColumnChunk.resizeBuffer(varListDataColumnChunk.getNumValues() + numValuesInList);
+    resizeDataChunkForValues(varListDataColumnChunk->getNumValues() + numValuesInList);
     for (auto i = 0u; i < numValuesInList; i++) {
-        varListDataColumnChunk.dataColumnChunk->write(
-            *NestedVal::getChildVal(&listVal, i), varListDataColumnChunk.getNumValues());
-        varListDataColumnChunk.increaseNumValues(1);
+        varListDataColumnChunk->write(
+            *NestedVal::getChildVal(&listVal, i), varListDataColumnChunk->getNumValues());
+        varListDataColumnChunk->setNumValues(varListDataColumnChunk->getNumValues() + 1);
     }
-    setValue(varListDataColumnChunk.getNumValues(), posToWrite);
+    setValue(varListDataColumnChunk->getNumValues(), posToWrite);
 }
 
 void VarListColumnChunk::resetToEmpty() {
@@ -77,7 +62,7 @@ void VarListColumnChunk::append(common::ValueVector* vector, common::offset_t st
         nextListOffsetInChunk += listLen;
         offsetBufferToWrite[startPosInChunk + i] = nextListOffsetInChunk;
     }
-    varListDataColumnChunk.resizeBuffer(nextListOffsetInChunk);
+    resizeDataChunkForValues(nextListOffsetInChunk);
     auto dataVector = ListVector::getDataVector(vector);
     dataVector->setState(std::make_unique<DataChunkState>());
     dataVector->state->selVector->resetSelectorToValuePosBuffer();
@@ -102,7 +87,7 @@ void VarListColumnChunk::copyListValues(const list_entry_t& entry, ValueVector* 
             dataVector->state->selVector->selectedPositions[j] =
                 entry.offset + numListValuesCopied + j;
         }
-        varListDataColumnChunk.append(dataVector);
+        varListDataColumnChunk->append(dataVector, varListDataColumnChunk->getNumValues());
         numListValuesCopied += numListValuesToCopyInBatch;
     }
 }

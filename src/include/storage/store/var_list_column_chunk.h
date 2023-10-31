@@ -1,54 +1,34 @@
 #pragma once
 
-#include "arrow/array/array_nested.h"
 #include "storage/store/column_chunk.h"
+#include <bit>
 
 namespace kuzu {
 namespace storage {
-
-struct VarListDataColumnChunk {
-    std::unique_ptr<ColumnChunk> dataColumnChunk;
-    uint64_t capacity;
-
-    explicit VarListDataColumnChunk(std::unique_ptr<ColumnChunk> dataChunk)
-        : dataColumnChunk{std::move(dataChunk)}, capacity{
-                                                     common::StorageConstants::NODE_GROUP_SIZE} {}
-
-    void reset() const;
-
-    void resizeBuffer(uint64_t numValues);
-
-    inline void append(common::ValueVector* dataVector) const {
-        dataColumnChunk->append(dataVector, dataColumnChunk->getNumValues());
-    }
-
-    inline uint64_t getNumValues() const { return dataColumnChunk->getNumValues(); }
-
-    inline void increaseNumValues(uint64_t numValues) const {
-        dataColumnChunk->numValues += numValues;
-    }
-};
 
 class VarListColumnChunk : public ColumnChunk {
 public:
     VarListColumnChunk(common::LogicalType dataType, bool enableCompression);
 
-    inline ColumnChunk* getDataColumnChunk() const {
-        return varListDataColumnChunk.dataColumnChunk.get();
-    }
+    inline ColumnChunk* getDataColumnChunk() const { return varListDataColumnChunk.get(); }
 
     void resetToEmpty() final;
 
     void append(common::ValueVector* vector, common::offset_t startPosInChunk) final;
 
+    inline void resizeDataChunkForValues(uint64_t numValues) {
+        if (numValues > varListDataColumnChunk->getCapacity()) {
+            varListDataColumnChunk->resize(std::bit_ceil(numValues));
+        }
+    }
+
     inline void resizeDataColumnChunk(uint64_t numBytesForBuffer) {
         // TODO(bmwinger): This won't work properly for booleans (will be one eighth as many values
         // as could fit)
-        auto numValues =
-            varListDataColumnChunk.dataColumnChunk->getNumBytesPerValue() == 0 ?
-                0 :
-                numBytesForBuffer / varListDataColumnChunk.dataColumnChunk->getNumBytesPerValue();
-        varListDataColumnChunk.resizeBuffer(numValues);
+        auto numValues = varListDataColumnChunk->getNumBytesPerValue() == 0 ?
+                             0 :
+                             numBytesForBuffer / varListDataColumnChunk->getNumBytesPerValue();
+        resizeDataChunkForValues(numValues);
     }
 
 private:
@@ -68,7 +48,7 @@ private:
     }
 
 private:
-    VarListDataColumnChunk varListDataColumnChunk;
+    std::unique_ptr<ColumnChunk> varListDataColumnChunk;
 };
 
 } // namespace storage
