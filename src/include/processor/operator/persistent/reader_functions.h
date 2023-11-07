@@ -39,7 +39,7 @@ struct ParallelCSVReaderFunctionData final : public ReaderFunctionData {
     inline bool hasMoreToRead() const override { return reader->hasMoreToRead(); }
 };
 
-struct ParquetReaderFunctionData : public ReaderFunctionData {
+struct ParquetReaderFunctionData final : public ReaderFunctionData {
     std::unique_ptr<ParquetReader> reader = nullptr;
     std::unique_ptr<ParquetReaderScanState> state = nullptr;
 

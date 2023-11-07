@@ -3,6 +3,10 @@
 #include "column_reader.h"
 #include "common/data_chunk/data_chunk.h"
 #include "common/types/types.h"
+#include "function/scalar_function.h"
+#include "function/table_functions.h"
+#include "function/table_functions/bind_data.h"
+#include "function/table_functions/bind_input.h"
 #include "parquet/parquet_types.h"
 #include "resizable_buffer.h"
 #include "thrift/protocol/TCompactProtocol.h"
@@ -44,6 +48,7 @@ public:
     void initializeScan(ParquetReaderScanState& state, std::vector<uint64_t> groups_to_read);
     bool scanInternal(ParquetReaderScanState& state, common::DataChunk& result);
     void scan(ParquetReaderScanState& state, common::DataChunk& result);
+    inline uint64_t getNumRowsGroups() { return metadata->row_groups.size(); }
 
     inline uint32_t getNumColumns() const { return columnNames.size(); }
     inline std::string getColumnName(uint32_t idx) const { return columnNames[idx]; }
@@ -85,6 +90,71 @@ private:
     std::vector<std::unique_ptr<common::LogicalType>> columnTypes;
     std::unique_ptr<kuzu_parquet::format::FileMetaData> metadata;
     storage::MemoryManager* memoryManager;
+};
+
+struct ParquetScanBindData : public function::TableFuncBindData {
+    ParquetScanBindData(std::vector<std::unique_ptr<common::LogicalType>> returnTypes,
+        std::vector<std::string> returnColumnNames, const common::ReaderConfig* config,
+        storage::MemoryManager* mm)
+        : TableFuncBindData{std::move(returnTypes), std::move(returnColumnNames)}, config{config},
+          mm{mm} {}
+
+    const common::ReaderConfig* config;
+    storage::MemoryManager* mm;
+
+    std::unique_ptr<TableFuncBindData> copy() override {
+        return std::make_unique<ParquetScanBindData>(
+            common::LogicalType::copy(returnTypes), returnColumnNames, config, mm);
+    }
+};
+
+class ParquetScanSharedState final : public function::SharedTableFuncState {
+public:
+    explicit ParquetScanSharedState(
+        const common::ReaderConfig* readerConfig, storage::MemoryManager* memoryManager)
+        : fileIdx{0}, groupIdx{0}, memoryManager{memoryManager} {
+        readers.push_back(
+            std::make_unique<ParquetReader>(readerConfig->filePaths[fileIdx], memoryManager));
+    }
+
+    std::vector<std::unique_ptr<ParquetReader>> readers;
+
+    std::mutex lock;
+    uint64_t fileIdx;
+    uint64_t groupIdx;
+    const common::ReaderConfig* readerConfig;
+    storage::MemoryManager* memoryManager;
+};
+
+struct ParquetScanLocalState final : public function::LocalTableFuncState {
+    ParquetReader* reader = nullptr;
+    std::unique_ptr<ParquetReaderScanState> state = nullptr;
+};
+
+struct ParquetScanBindInput final : public function::TableFuncBindInput {
+    const common::ReaderConfig* config;
+    storage::MemoryManager* mm;
+};
+
+class ParquetScanFunction {
+    static function::function_set getFunctionSet();
+
+    static void tableFunc(function::TableFunctionInput& input, common::DataChunk& outputChunk);
+
+    static std::unique_ptr<function::TableFuncBindData> bindFunc(main::ClientContext* /*context*/,
+        function::TableFuncBindInput* input, catalog::CatalogContent* catalog) {
+        auto parquetScanBindInput = reinterpret_cast<ParquetScanBindInput*>(input);
+        return std::make_unique<ParquetScanBindData>(
+            common::LogicalType::copy(parquetScanBindInput->config->columnTypes),
+            parquetScanBindInput->config->columnNames, parquetScanBindInput->config,
+            parquetScanBindInput->mm);
+    }
+
+    static std::unique_ptr<function::SharedTableFuncState> initSharedState(
+        function::TableFunctionInitInput& input);
+
+    static std::unique_ptr<function::LocalTableFuncState> initLocalState(
+        function::TableFunctionInitInput& input, function::SharedTableFuncState* state);
 };
 
 } // namespace processor

@@ -11,6 +11,11 @@ struct InQueryCallSharedState {
     std::unique_ptr<function::SharedTableFuncState> sharedState;
 };
 
+struct InQueryCallLocalState {
+    std::unique_ptr<common::DataChunk> outputChunk;
+    std::unique_ptr<function::LocalTableFuncState> localState;
+};
+
 struct InQueryCallInfo {
     function::TableFunction* function;
     std::unique_ptr<function::TableFuncBindData> bindData;
@@ -49,7 +54,7 @@ public:
 protected:
     std::unique_ptr<InQueryCallInfo> inQueryCallInfo;
     std::shared_ptr<InQueryCallSharedState> sharedState;
-    std::vector<common::ValueVector*> outputVectors;
+    std::unique_ptr<InQueryCallLocalState> localState;
 };
 
 } // namespace processor

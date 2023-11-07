@@ -117,12 +117,14 @@ std::unique_ptr<BoundReadingClause> Binder::bindInQueryCall(const ReadingClause&
     StringUtils::toUpper(funcNameToMatch);
     auto tableFunction = reinterpret_cast<function::TableFunction*>(
         catalog.getBuiltInFunctions()->matchScalarFunction(std::move(funcNameToMatch), inputTypes));
-    auto bindData = tableFunction->bindFunc(clientContext,
-        function::TableFuncBindInput{std::move(inputValues)}, catalog.getReadOnlyVersion());
+    auto tableFuncBindInput =
+        std::make_unique<function::TableFuncBindInput>(std::move(inputValues));
+    auto bindData = tableFunction->bindFunc(
+        clientContext, tableFuncBindInput.get(), catalog.getReadOnlyVersion());
     expression_vector outputExpressions;
     for (auto i = 0u; i < bindData->returnColumnNames.size(); i++) {
         outputExpressions.push_back(
-            createVariable(bindData->returnColumnNames[i], bindData->returnTypes[i]));
+            createVariable(bindData->returnColumnNames[i], *bindData->returnTypes[i]));
     }
     return std::make_unique<BoundInQueryCall>(
         std::move(tableFunction), std::move(bindData), std::move(outputExpressions));

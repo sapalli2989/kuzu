@@ -6,9 +6,16 @@ namespace kuzu {
 namespace processor {
 
 void InQueryCall::initLocalStateInternal(ResultSet* resultSet, ExecutionContext* /*context*/) {
-    for (auto& outputPos : inQueryCallInfo->outputPoses) {
-        outputVectors.push_back(resultSet->getValueVector(outputPos).get());
+    localState = std::make_unique<InQueryCallLocalState>();
+    localState->outputChunk = std::make_unique<DataChunk>(inQueryCallInfo->outputPoses.size(),
+        resultSet->getDataChunk(inQueryCallInfo->outputPoses[0].dataChunkPos)->state);
+    for (auto i = 0u; i < inQueryCallInfo->outputPoses.size(); i++) {
+        localState->outputChunk->insert(
+            i, resultSet->getValueVector(inQueryCallInfo->outputPoses[i]));
     }
+    function::TableFunctionInitInput tableFunctionInitInput{inQueryCallInfo->bindData.get()};
+    localState->localState = inQueryCallInfo->function->initLocalStateFunc(
+        tableFunctionInitInput, sharedState->sharedState.get());
 }
 
 void InQueryCall::initGlobalStateInternal(ExecutionContext* /*context*/) {
@@ -18,10 +25,10 @@ void InQueryCall::initGlobalStateInternal(ExecutionContext* /*context*/) {
 }
 
 bool InQueryCall::getNextTuplesInternal(ExecutionContext* /*context*/) {
-    function::TableFunctionInput tableFunctionInput{
-        inQueryCallInfo->bindData.get(), sharedState->sharedState.get()};
-    inQueryCallInfo->function->tableFunc(tableFunctionInput, outputVectors);
-    return outputVectors[0]->state->selVector->selectedSize != 0;
+    function::TableFunctionInput tableFunctionInput{inQueryCallInfo->bindData.get(),
+        localState->localState.get(), sharedState->sharedState.get()};
+    inQueryCallInfo->function->tableFunc(tableFunctionInput, *localState->outputChunk);
+    return localState->outputChunk->state->selVector->selectedSize != 0;
 }
 
 } // namespace processor

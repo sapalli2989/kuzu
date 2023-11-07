@@ -19,6 +19,7 @@
 #include "function/string/vector_string_functions.h"
 #include "function/struct/vector_struct_functions.h"
 #include "function/table_functions/call_functions.h"
+#include "function/table_functions/copy_parquet.h"
 #include "function/timestamp/vector_timestamp_functions.h"
 #include "function/union/vector_union_functions.h"
 

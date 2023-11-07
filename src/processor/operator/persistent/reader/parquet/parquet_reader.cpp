@@ -12,9 +12,12 @@ using namespace kuzu_parquet::format;
 namespace kuzu {
 namespace processor {
 
+using namespace kuzu::function;
+using namespace kuzu::common;
+
 ParquetReader::ParquetReader(const std::string& filePath, storage::MemoryManager* memoryManager)
     : filePath{filePath}, memoryManager{memoryManager} {
-    fileInfo = common::FileUtils::openFile(filePath, O_RDONLY);
+    fileInfo = FileUtils::openFile(filePath, O_RDONLY);
     initMetadata();
 }
 
@@ -26,16 +29,16 @@ void ParquetReader::initializeScan(
     state.groupIdxList = std::move(groups_to_read);
     if (!state.fileInfo || state.fileInfo->path != fileInfo->path) {
         state.prefetchMode = false;
-        state.fileInfo = common::FileUtils::openFile(fileInfo->path, O_RDONLY);
+        state.fileInfo = FileUtils::openFile(fileInfo->path, O_RDONLY);
     }
 
     state.thriftFileProto = createThriftProtocol(state.fileInfo.get(), state.prefetchMode);
     state.rootReader = createReader();
-    state.defineBuf.resize(common::DEFAULT_VECTOR_CAPACITY);
-    state.repeatBuf.resize(common::DEFAULT_VECTOR_CAPACITY);
+    state.defineBuf.resize(DEFAULT_VECTOR_CAPACITY);
+    state.repeatBuf.resize(DEFAULT_VECTOR_CAPACITY);
 }
 
-bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChunk& result) {
+bool ParquetReader::scanInternal(ParquetReaderScanState& state, DataChunk& result) {
     if (state.finished) {
         return false;
     }
@@ -74,8 +77,8 @@ bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChun
             double scanPercentage = (double)(toScanCompressedBytes) / totalRowGroupSpan;
 
             if (toScanCompressedBytes > totalRowGroupSpan) {
-                throw common::CopyException("Malformed parquet file: sum of total compressed bytes "
-                                            "of columns seems incorrect");
+                throw CopyException("Malformed parquet file: sum of total compressed bytes "
+                                    "of columns seems incorrect");
             }
 
             if (scanPercentage > ParquetReaderPrefetchConfig::WHOLE_GROUP_PREFETCH_MINIMUM_SCAN) {
@@ -97,9 +100,7 @@ bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChun
                     auto fileColIdx = colIdx;
                     auto rootReader = reinterpret_cast<StructColumnReader*>(state.rootReader.get());
 
-                    bool hasFilter = false;
-                    rootReader->getChildReader(fileColIdx)
-                        ->registerPrefetch(trans, !(lazyFetch && !hasFilter));
+                    rootReader->getChildReader(fileColIdx)->registerPrefetch(trans, !lazyFetch);
                 }
 
                 trans.FinalizeRegistration();
@@ -112,8 +113,8 @@ bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChun
         return true;
     }
 
-    auto thisOutputChunkRows = std::min<uint64_t>(
-        common::DEFAULT_VECTOR_CAPACITY, getGroup(state).num_rows - state.groupOffset);
+    auto thisOutputChunkRows =
+        std::min<uint64_t>(DEFAULT_VECTOR_CAPACITY, getGroup(state).num_rows - state.groupOffset);
     result.state->selVector->selectedSize = thisOutputChunkRows;
 
     if (thisOutputChunkRows == 0) {
@@ -121,13 +122,13 @@ bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChun
         return false; // end of last group, we are done
     }
 
-    // we evaluate simple table filters directly in this scan so we can skip decoding column data
+    // we evaluate simple table filters directly in this scan, so we can skip decoding column data
     // that's never going to be relevant
     parquet_filter_t filterMask;
     filterMask.set();
 
     // mask out unused part of bitset
-    for (auto i = thisOutputChunkRows; i < common::DEFAULT_VECTOR_CAPACITY; i++) {
+    for (auto i = thisOutputChunkRows; i < DEFAULT_VECTOR_CAPACITY; i++) {
         filterMask.set(i, false);
     }
 
@@ -146,9 +147,9 @@ bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChun
         auto rowsRead = childReader->read(resultVector->state->selVector->selectedSize, filterMask,
             definePtr, repeatPtr, resultVector.get());
         if (rowsRead != result.state->selVector->selectedSize) {
-            throw common::CopyException(common::stringFormat(
-                "Mismatch in parquet read for column {}, expected {} rows, got {}", fileColIdx,
-                result.state->selVector->selectedSize, rowsRead));
+            throw CopyException(
+                stringFormat("Mismatch in parquet read for column {}, expected {} rows, got {}",
+                    fileColIdx, result.state->selVector->selectedSize, rowsRead));
         }
     }
 
@@ -156,7 +157,7 @@ bool ParquetReader::scanInternal(ParquetReaderScanState& state, common::DataChun
     return true;
 }
 
-void ParquetReader::scan(processor::ParquetReaderScanState& state, common::DataChunk& result) {
+void ParquetReader::scan(processor::ParquetReaderScanState& state, DataChunk& result) {
     while (scanInternal(state, result)) {
         if (result.state->selVector->selectedSize > 0) {
             break;
@@ -169,8 +170,8 @@ void ParquetReader::initMetadata() {
     auto& transport = reinterpret_cast<ThriftFileTransport&>(*proto->getTransport());
     auto fileSize = transport.GetSize();
     if (fileSize < 12) {
-        throw common::CopyException{common::stringFormat(
-            "File {} is too small to be a Parquet file", fileInfo->path.c_str())};
+        throw CopyException{
+            stringFormat("File {} is too small to be a Parquet file", fileInfo->path.c_str())};
     }
 
     ResizeableBuffer buf;
@@ -182,17 +183,16 @@ void ParquetReader::initMetadata() {
 
     if (memcmp(buf.ptr + 4, "PAR1", 4) != 0) {
         if (memcmp(buf.ptr + 4, "PARE", 4) == 0) {
-            throw common::CopyException{common::stringFormat(
+            throw CopyException{stringFormat(
                 "Encrypted Parquet files are not supported for file {}", fileInfo->path.c_str())};
         }
-        throw common::CopyException{common::stringFormat(
-            "No magic bytes found at the end of file {}", fileInfo->path.c_str())};
+        throw CopyException{
+            stringFormat("No magic bytes found at the end of file {}", fileInfo->path.c_str())};
     }
     // read four-byte footer length from just before the end magic bytes
     auto footerLen = *reinterpret_cast<uint32_t*>(buf.ptr);
     if (footerLen == 0 || fileSize < 12 + footerLen) {
-        throw common::CopyException{
-            common::stringFormat("Footer length error in file {}", fileInfo->path.c_str())};
+        throw CopyException{stringFormat("Footer length error in file {}", fileInfo->path.c_str())};
     }
     auto metadataPos = fileSize - (footerLen + 8);
     transport.SetLocation(metadataPos);
@@ -219,7 +219,7 @@ std::unique_ptr<ColumnReader> ParquetReader::createReaderRecursive(uint64_t dept
         maxRepeat++;
     }
     if (sEle.__isset.num_children && sEle.num_children > 0) {
-        std::vector<std::unique_ptr<common::StructField>> structFields;
+        std::vector<std::unique_ptr<StructField>> structFields;
         std::vector<std::unique_ptr<ColumnReader>> childrenReaders;
         uint64_t cIdx = 0;
         while (cIdx < (uint64_t)sEle.num_children) {
@@ -227,14 +227,14 @@ std::unique_ptr<ColumnReader> ParquetReader::createReaderRecursive(uint64_t dept
             auto& childEle = metadata->schema[nextSchemaIdx];
             auto childReader =
                 createReaderRecursive(depth + 1, maxDefine, maxRepeat, nextSchemaIdx, nextFileIdx);
-            structFields.push_back(std::make_unique<common::StructField>(
-                childEle.name, childReader->getDataType()->copy()));
+            structFields.push_back(
+                std::make_unique<StructField>(childEle.name, childReader->getDataType()->copy()));
             childrenReaders.push_back(std::move(childReader));
             cIdx++;
         }
         KU_ASSERT(!structFields.empty());
         std::unique_ptr<ColumnReader> result;
-        std::unique_ptr<common::LogicalType> resultType;
+        std::unique_ptr<LogicalType> resultType;
 
         bool isRepeated = repetition_type == FieldRepetitionType::REPEATED;
         bool isList = sEle.__isset.converted_type && sEle.converted_type == ConvertedType::LIST;
@@ -253,27 +253,27 @@ std::unique_ptr<ColumnReader> ParquetReader::createReaderRecursive(uint64_t dept
         if (isMapKV) {
             // LCOV_EXCL_START
             if (structFields.size() != 2) {
-                throw common::CopyException{"MAP_KEY_VALUE requires two children"};
+                throw CopyException{"MAP_KEY_VALUE requires two children"};
             }
             if (!isRepeated) {
-                throw common::CopyException{"MAP_KEY_VALUE needs to be repeated"};
+                throw CopyException{"MAP_KEY_VALUE needs to be repeated"};
             }
             // LCOV_EXCL_STOP
-            auto structType = std::make_unique<common::LogicalType>(common::LogicalTypeID::STRUCT,
-                std::make_unique<common::StructTypeInfo>(std::move(structFields)));
-            resultType = std::make_unique<common::LogicalType>(common::LogicalTypeID::MAP,
-                std::make_unique<common::VarListTypeInfo>(std::move(structType)));
+            auto structType = std::make_unique<LogicalType>(
+                LogicalTypeID::STRUCT, std::make_unique<StructTypeInfo>(std::move(structFields)));
+            resultType = std::make_unique<LogicalType>(
+                LogicalTypeID::MAP, std::make_unique<VarListTypeInfo>(std::move(structType)));
 
             auto structReader = std::make_unique<StructColumnReader>(*this,
-                common::VarListType::getChildType(resultType.get())->copy(), sEle, thisIdx,
-                maxDefine - 1, maxRepeat - 1, std::move(childrenReaders));
+                VarListType::getChildType(resultType.get())->copy(), sEle, thisIdx, maxDefine - 1,
+                maxRepeat - 1, std::move(childrenReaders));
             return std::make_unique<ListColumnReader>(*this, std::move(resultType), sEle, thisIdx,
                 maxDefine, maxRepeat, std::move(structReader), memoryManager);
         }
 
         if (structFields.size() > 1 || (!isList && !isMap && !isRepeated)) {
-            resultType = std::make_unique<common::LogicalType>(common::LogicalTypeID::STRUCT,
-                std::make_unique<common::StructTypeInfo>(std::move(structFields)));
+            resultType = std::make_unique<LogicalType>(
+                LogicalTypeID::STRUCT, std::make_unique<StructTypeInfo>(std::move(structFields)));
             result = std::make_unique<StructColumnReader>(*this, std::move(resultType), sEle,
                 thisIdx, maxDefine, maxRepeat, std::move(childrenReaders));
         } else {
@@ -282,9 +282,9 @@ std::unique_ptr<ColumnReader> ParquetReader::createReaderRecursive(uint64_t dept
             result = std::move(childrenReaders[0]);
         }
         if (isRepeated) {
-            auto varListInfo = std::make_unique<common::VarListTypeInfo>(std::move(resultType));
-            resultType = std::make_unique<common::LogicalType>(
-                common::LogicalTypeID::VAR_LIST, std::move(varListInfo));
+            auto varListInfo = std::make_unique<VarListTypeInfo>(std::move(resultType));
+            resultType =
+                std::make_unique<LogicalType>(LogicalTypeID::VAR_LIST, std::move(varListInfo));
             return std::make_unique<ListColumnReader>(*this, std::move(resultType), sEle, thisIdx,
                 maxDefine, maxRepeat, std::move(result), memoryManager);
         }
@@ -292,15 +292,15 @@ std::unique_ptr<ColumnReader> ParquetReader::createReaderRecursive(uint64_t dept
     } else {
         // LCOV_EXCL_START
         if (!sEle.__isset.type) {
-            throw common::CopyException{"Node has neither num_children nor type set - this "
-                                        "violates the Parquet spec (corrupted file)"};
+            throw CopyException{"Node has neither num_children nor type set - this "
+                                "violates the Parquet spec (corrupted file)"};
         }
         // LCOV_EXCL_STOP
         if (sEle.repetition_type == FieldRepetitionType::REPEATED) {
             auto derivedType = deriveLogicalType(sEle);
-            auto varListTypeInfo = std::make_unique<common::VarListTypeInfo>(derivedType->copy());
-            auto listType = std::make_unique<common::LogicalType>(
-                common::LogicalTypeID::VAR_LIST, std::move(varListTypeInfo));
+            auto varListTypeInfo = std::make_unique<VarListTypeInfo>(derivedType->copy());
+            auto listType =
+                std::make_unique<LogicalType>(LogicalTypeID::VAR_LIST, std::move(varListTypeInfo));
             auto elementReader = ColumnReader::createReader(
                 *this, std::move(derivedType), sEle, nextFileIdx++, maxDefine, maxRepeat);
             return std::make_unique<ListColumnReader>(*this, std::move(listType), sEle, thisIdx,
@@ -317,16 +317,16 @@ std::unique_ptr<ColumnReader> ParquetReader::createReader() {
     uint64_t nextFileIdx = 0;
 
     if (metadata->schema.empty()) {
-        throw common::CopyException{"Parquet reader: no schema elements found"};
+        throw CopyException{"Parquet reader: no schema elements found"};
     }
     if (metadata->schema[0].num_children == 0) {
-        throw common::CopyException{"Parquet reader: root schema element has no children"};
+        throw CopyException{"Parquet reader: root schema element has no children"};
     }
     auto rootReader = createReaderRecursive(0, 0, 0, nextSchemaIdx, nextFileIdx);
-    if (rootReader->getDataType()->getPhysicalType() != common::PhysicalTypeID::STRUCT) {
-        throw common::CopyException{"Root element of Parquet file must be a struct"};
+    if (rootReader->getDataType()->getPhysicalType() != PhysicalTypeID::STRUCT) {
+        throw CopyException{"Root element of Parquet file must be a struct"};
     }
-    for (auto& field : common::StructType::getFields(rootReader->getDataType())) {
+    for (auto& field : StructType::getFields(rootReader->getDataType())) {
         columnNames.push_back(field->getName());
         columnTypes.push_back(field->getType()->copy());
     }
@@ -371,124 +371,122 @@ uint64_t ParquetReader::getGroupSpan(ParquetReaderScanState& state) {
     return max_offset - min_offset;
 }
 
-std::unique_ptr<common::LogicalType> ParquetReader::deriveLogicalType(
+std::unique_ptr<LogicalType> ParquetReader::deriveLogicalType(
     const kuzu_parquet::format::SchemaElement& s_ele) {
     // inner node
     if (s_ele.type == Type::FIXED_LEN_BYTE_ARRAY && !s_ele.__isset.type_length) {
         // LCOV_EXCL_START
-        throw common::CopyException("FIXED_LEN_BYTE_ARRAY requires length to be set");
+        throw CopyException("FIXED_LEN_BYTE_ARRAY requires length to be set");
         // LCOV_EXCL_STOP
     }
     if (s_ele.__isset.converted_type) {
         switch (s_ele.converted_type) {
         case ConvertedType::INT_8:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::INT8);
+                return std::make_unique<LogicalType>(LogicalTypeID::INT8);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
-                    "INT8 converted type can only be set for value of Type::INT32"};
+                throw CopyException{"INT8 converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::INT_16:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::INT16);
+                return std::make_unique<LogicalType>(LogicalTypeID::INT16);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "INT16 converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::INT_32:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::INT32);
+                return std::make_unique<LogicalType>(LogicalTypeID::INT32);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "INT32 converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::INT_64:
             if (s_ele.type == Type::INT64) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::INT64);
+                return std::make_unique<LogicalType>(LogicalTypeID::INT64);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "INT64 converted type can only be set for value of Type::INT64"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::UINT_8:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::UINT8);
+                return std::make_unique<LogicalType>(LogicalTypeID::UINT8);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "UINT8 converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::UINT_16:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::UINT16);
+                return std::make_unique<LogicalType>(LogicalTypeID::UINT16);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "UINT16 converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::UINT_32:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::UINT32);
+                return std::make_unique<LogicalType>(LogicalTypeID::UINT32);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "UINT32 converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::UINT_64:
             if (s_ele.type == Type::INT64) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::UINT64);
+                return std::make_unique<LogicalType>(LogicalTypeID::UINT64);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
+                throw CopyException{
                     "UINT64 converted type can only be set for value of Type::INT64"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::DATE:
             if (s_ele.type == Type::INT32) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::DATE);
+                return std::make_unique<LogicalType>(LogicalTypeID::DATE);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException{
-                    "DATE converted type can only be set for value of Type::INT32"};
+                throw CopyException{"DATE converted type can only be set for value of Type::INT32"};
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::TIMESTAMP_MICROS:
         case ConvertedType::TIMESTAMP_MILLIS:
             if (s_ele.type == Type::INT64) {
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::TIMESTAMP);
+                return std::make_unique<LogicalType>(LogicalTypeID::TIMESTAMP);
             } else {
                 // LCOV_EXCL_START
-                throw common::CopyException(
+                throw CopyException(
                     "TIMESTAMP converted type can only be set for value of Type::INT64");
                 // LCOV_EXCL_STOP
             }
         case ConvertedType::INTERVAL: {
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::INTERVAL);
+            return std::make_unique<LogicalType>(LogicalTypeID::INTERVAL);
         }
         case ConvertedType::UTF8:
             switch (s_ele.type) {
             case Type::BYTE_ARRAY:
             case Type::FIXED_LEN_BYTE_ARRAY:
-                return std::make_unique<common::LogicalType>(common::LogicalTypeID::STRING);
+                return std::make_unique<LogicalType>(LogicalTypeID::STRING);
                 // LCOV_EXCL_START
             default:
-                throw common::CopyException(
+                throw CopyException(
                     "UTF8 converted type can only be set for Type::(FIXED_LEN_)BYTE_ARRAY");
                 // LCOV_EXCL_STOP
             }
         default:
             // LCOV_EXCL_START
-            throw common::CopyException{"Unsupported converted type"};
+            throw CopyException{"Unsupported converted type"};
             // LCOV_EXCL_STOP
         }
     } else {
@@ -496,23 +494,23 @@ std::unique_ptr<common::LogicalType> ParquetReader::deriveLogicalType(
         // use default type for each physical type
         switch (s_ele.type) {
         case Type::BOOLEAN:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::BOOL);
+            return std::make_unique<LogicalType>(LogicalTypeID::BOOL);
         case Type::INT32:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::INT32);
+            return std::make_unique<LogicalType>(LogicalTypeID::INT32);
         case Type::INT64:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::INT64);
+            return std::make_unique<LogicalType>(LogicalTypeID::INT64);
         case Type::INT96:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::TIMESTAMP);
+            return std::make_unique<LogicalType>(LogicalTypeID::TIMESTAMP);
         case Type::FLOAT:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::FLOAT);
+            return std::make_unique<LogicalType>(LogicalTypeID::FLOAT);
         case Type::DOUBLE:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::DOUBLE);
+            return std::make_unique<LogicalType>(LogicalTypeID::DOUBLE);
         case Type::BYTE_ARRAY:
         case Type::FIXED_LEN_BYTE_ARRAY:
             // TODO(Ziyi): Support parquet copy option(binary_as_string).
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::BLOB);
+            return std::make_unique<LogicalType>(LogicalTypeID::BLOB);
         default:
-            return std::make_unique<common::LogicalType>(common::LogicalTypeID::ANY);
+            return std::make_unique<LogicalType>(LogicalTypeID::ANY);
         }
     }
 }
@@ -532,7 +530,7 @@ uint64_t ParquetReader::getGroupCompressedSize(ParquetReaderScanState& state) {
 
     if (total_compressed_size != 0 && calc_compressed_size != 0 &&
         (uint64_t)total_compressed_size != calc_compressed_size) {
-        throw common::CopyException(
+        throw CopyException(
             "mismatch between calculated compressed size and reported compressed size");
     }
 
@@ -555,6 +553,79 @@ uint64_t ParquetReader::getGroupOffset(ParquetReaderScanState& state) {
     }
 
     return minOffset;
+}
+
+function_set ParquetScanFunction::getFunctionSet() {
+    function_set functionSet;
+    functionSet.push_back(std::make_unique<TableFunction>("copy_csv", tableFunc, bindFunc,
+        initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    return functionSet;
+}
+
+std::unique_ptr<function::SharedTableFuncState> ParquetScanFunction::initSharedState(
+    TableFunctionInitInput& input) {
+    auto parquetScanBindData = reinterpret_cast<ParquetScanBindData*>(input.bindData);
+    row_idx_t numRows = 0;
+    for (const auto& path : parquetScanBindData->config->filePaths) {
+        auto reader = std::make_unique<ParquetReader>(path, parquetScanBindData->mm);
+        numRows += reader->getMetadata()->num_rows;
+    }
+    return std::make_unique<ParquetScanSharedState>(
+        parquetScanBindData->config, parquetScanBindData->mm);
+}
+
+bool parquetSharedStateNext(
+    ParquetScanLocalState& localState, ParquetScanSharedState& sharedState) {
+    std::lock_guard<std::mutex> lock(sharedState.lock);
+    while (true) {
+        if (sharedState.fileIdx >= sharedState.readerConfig->getNumFiles()) {
+            return false;
+        }
+        if (sharedState.groupIdx < sharedState.readers[sharedState.fileIdx]->getNumRowsGroups()) {
+            localState.reader = sharedState.readers[sharedState.fileIdx].get();
+            localState.reader->initializeScan(*localState.state, {sharedState.groupIdx});
+            sharedState.groupIdx++;
+            return true;
+        } else {
+            sharedState.groupIdx = 0;
+            sharedState.fileIdx++;
+            if (sharedState.fileIdx >= sharedState.readerConfig->getNumFiles()) {
+                return false;
+            }
+            sharedState.readers.push_back(std::make_unique<ParquetReader>(
+                sharedState.readerConfig->filePaths[sharedState.fileIdx],
+                sharedState.memoryManager));
+            continue;
+        }
+    }
+}
+
+std::unique_ptr<function::LocalTableFuncState> ParquetScanFunction::initLocalState(
+    TableFunctionInitInput& input, SharedTableFuncState* state) {
+    auto parquetScanSharedState = reinterpret_cast<ParquetScanSharedState*>(state);
+    auto localState = std::make_unique<ParquetScanLocalState>();
+    if (!parquetSharedStateNext(*localState, *parquetScanSharedState)) {
+        return nullptr;
+    }
+    return localState;
+}
+
+void ParquetScanFunction::tableFunc(TableFunctionInput& input, DataChunk& outputChunk) {
+    if (input.localState == nullptr) {
+        return;
+    }
+    auto parquetScanLocalState = reinterpret_cast<ParquetScanLocalState*>(input.localState);
+    auto parquetScanSharedState = reinterpret_cast<ParquetScanSharedState*>(input.sharedState);
+
+    do {
+        parquetScanLocalState->reader->scan(*parquetScanLocalState->state, outputChunk);
+        if (outputChunk.state->selVector->selectedSize > 0) {
+            return;
+        }
+        if (!parquetSharedStateNext(*parquetScanLocalState, *parquetScanSharedState)) {
+            return;
+        }
+    } while (true);
 }
 
 } // namespace processor

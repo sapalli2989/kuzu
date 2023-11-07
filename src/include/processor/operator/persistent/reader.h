@@ -44,7 +44,6 @@ public:
 
     void initLocalStateInternal(ResultSet* resultSet, ExecutionContext* context) final;
 
-    inline ReaderInfo* getReaderInfo() const { return info.get(); }
     inline ReaderSharedState* getSharedState() const { return sharedState.get(); }
 
     inline std::unique_ptr<PhysicalOperator> clone() final {

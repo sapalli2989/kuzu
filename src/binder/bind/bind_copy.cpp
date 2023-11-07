@@ -9,6 +9,7 @@
 #include "common/string_format.h"
 #include "parser/copy.h"
 
+
 using namespace kuzu::binder;
 using namespace kuzu::catalog;
 using namespace kuzu::common;
