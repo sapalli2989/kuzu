@@ -25,7 +25,7 @@ struct ScanBindData : public function::TableFuncBindData {
         : TableFuncBindData{std::move(returnTypes), std::move(returnColumnNames)}, config{config},
           mm{mm} {}
 
-    const common::ReaderConfig config;
+    common::ReaderConfig config;
     storage::MemoryManager* mm;
 
     std::unique_ptr<TableFuncBindData> copy() override {

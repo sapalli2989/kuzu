@@ -697,5 +697,21 @@ TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
     renameProperty(TransactionTestType::RECOVERY);
 }
 
+TEST_F(EmptyDBTest, dsad) {
+    createDBAndConn();
+    ASSERT_TRUE(
+        conn->query("create node table person(id int64, name string, a int64[], primary key(id))")
+            ->isSuccess());
+    ASSERT_TRUE(conn->query("load from "
+                            "'/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/"
+                            "compression/zstd.parquet' return *")
+                    ->isSuccess());
+    printf("%s", conn->query("load from "
+                             "'/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/"
+                             "compression/zstd.parquet' return *")
+                     ->toString()
+                     .c_str());
+}
+
 } // namespace testing
 } // namespace kuzu

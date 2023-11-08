@@ -237,7 +237,7 @@ void ReaderFunctions::readRowsFromParquetFile(const ReaderFunctionData& function
 void ReaderFunctions::readRowsFromNPYFile(const ReaderFunctionData& functionData,
     common::block_idx_t blockIdx, common::DataChunk* dataChunkToRead) {
     auto& readerData = reinterpret_cast<const NPYReaderFunctionData&>(functionData);
-    readerData.reader->readBlock(blockIdx, dataChunkToRead);
+    readerData.reader->readBlock(blockIdx, *dataChunkToRead);
 }
 
 void ReaderFunctions::readRowsFromRDFFile(const ReaderFunctionData& functionData,

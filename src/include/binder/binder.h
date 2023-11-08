@@ -5,6 +5,8 @@
 #include "catalog/catalog.h"
 #include "common/copier_config/copier_config.h"
 #include "expression_binder.h"
+#include "function/table_functions.h"
+#include "function/table_functions/bind_data.h"
 #include "parser/query/graph_pattern/pattern_element.h"
 #include "parser/query/regular_query.h"
 #include "storage/storage_manager.h"
@@ -119,14 +121,18 @@ private:
 
     /*** bind copy ***/
     std::unique_ptr<BoundStatement> bindCopyFromClause(const parser::Statement& statement);
-    std::unique_ptr<BoundStatement> bindCopyNodeFrom(
-        std::unique_ptr<common::ReaderConfig> readerConfig, catalog::TableSchema* tableSchema);
-    std::unique_ptr<BoundStatement> bindCopyRdfNodeFrom(
-        std::unique_ptr<common::ReaderConfig> readerConfig, catalog::TableSchema* tableSchema);
-    std::unique_ptr<BoundStatement> bindCopyRelFrom(
-        std::unique_ptr<common::ReaderConfig> readerConfig, catalog::TableSchema* tableSchema);
-    std::unique_ptr<BoundStatement> bindCopyRdfRelFrom(
-        std::unique_ptr<common::ReaderConfig> readerConfig, catalog::TableSchema* tableSchema);
+    std::unique_ptr<BoundStatement> bindCopyNodeFrom(function::TableFunction* copyFunc,
+        std::unique_ptr<function::TableFuncBindData> copyFuncBindData,
+        catalog::TableSchema* tableSchema);
+    std::unique_ptr<BoundStatement> bindCopyRdfNodeFrom(function::TableFunction* copyFunc,
+        std::unique_ptr<function::TableFuncBindData> copyFuncBindData,
+        catalog::TableSchema* tableSchema);
+    std::unique_ptr<BoundStatement> bindCopyRelFrom(function::TableFunction* copyFunc,
+        std::unique_ptr<function::TableFuncBindData> copyFuncBindData,
+        catalog::TableSchema* tableSchema);
+    std::unique_ptr<BoundStatement> bindCopyRdfRelFrom(function::TableFunction* copyFunc,
+        std::unique_ptr<function::TableFuncBindData> copyFuncBindData,
+        catalog::TableSchema* tableSchema);
     expression_vector bindExpectedNodeFileColumns(
         catalog::TableSchema* tableSchema, common::ReaderConfig& readerConfig);
     expression_vector bindExpectedRelFileColumns(

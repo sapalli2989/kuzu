@@ -53,7 +53,7 @@ class NpyMultiFileReader {
 public:
     explicit NpyMultiFileReader(const std::vector<std::string>& filePaths);
 
-    void readBlock(common::block_idx_t blockIdx, common::DataChunk* dataChunkToRead) const;
+    void readBlock(common::block_idx_t blockIdx, common::DataChunk& dataChunkToRead) const;
 
 private:
     std::vector<std::unique_ptr<NpyReader>> fileReaders;

@@ -225,9 +225,9 @@ NpyMultiFileReader::NpyMultiFileReader(const std::vector<std::string>& filePaths
     }
 }
 
-void NpyMultiFileReader::readBlock(block_idx_t blockIdx, common::DataChunk* dataChunkToRead) const {
+void NpyMultiFileReader::readBlock(block_idx_t blockIdx, common::DataChunk& dataChunkToRead) const {
     for (auto i = 0u; i < fileReaders.size(); i++) {
-        fileReaders[i]->readBlock(blockIdx, dataChunkToRead->getValueVector(i).get());
+        fileReaders[i]->readBlock(blockIdx, dataChunkToRead.getValueVector(i).get());
     }
 }
 
@@ -239,7 +239,9 @@ function_set NpyScanFunction::getFunctionSet() {
 }
 
 void NpyScanFunction::tableFunc(TableFunctionInput& input, DataChunk& outputChunk) {
-
+    auto sharedState = reinterpret_cast<NpyScanSharedState*>(input.sharedState);
+    auto blockIdx = sharedState->getNext();
+    sharedState->npyMultiFileReader->readBlock(blockIdx, outputChunk);
 }
 
 std::unique_ptr<function::TableFuncBindData> NpyScanFunction::bindFunc(

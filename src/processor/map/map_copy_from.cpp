@@ -62,9 +62,11 @@ std::unique_ptr<PhysicalOperator> PlanMapper::mapCopyNodeFrom(LogicalOperator* l
     auto info = std::make_unique<CopyNodeInfo>(std::move(dataColumnPoses), nodeTable,
         tableSchema->tableName, copyFromInfo->containsSerial, storageManager.compressionEnabled());
     std::unique_ptr<PhysicalOperator> copyNode;
-    auto readerConfig = copyFromInfo->fileScanInfo->readerConfig.get();
-    if (readerConfig->fileType == FileType::TURTLE &&
-        readerConfig->rdfReaderConfig->mode == RdfReaderMode::RESOURCE) {
+    auto readerConfig = reinterpret_cast<function::ScanBindData*>(
+        copyFromInfo->fileScanInfo->copyFuncBindData.get())
+                            ->config;
+    if (readerConfig.fileType == FileType::TURTLE &&
+        readerConfig.rdfReaderConfig->mode == RdfReaderMode::RESOURCE) {
         copyNode = std::make_unique<CopyRdfResource>(sharedState, std::move(info),
             std::make_unique<ResultSetDescriptor>(copyFrom->getSchema()), std::move(prevOperator),
             getOperatorID(), copyFrom->getExpressionsForPrinting());
@@ -96,7 +98,10 @@ std::unique_ptr<PhysicalOperator> PlanMapper::createCopyRel(
     auto relIDDataPos =
         DataPos{outFSchema->getExpressionPos(*copyFromInfo->fileScanInfo->internalID)};
     DataPos srcOffsetPos, dstOffsetPos;
-    if (copyFromInfo->fileScanInfo->readerConfig->fileType == FileType::TURTLE) {
+    auto readerConfig = reinterpret_cast<function::ScanBindData*>(
+        copyFromInfo->fileScanInfo->copyFuncBindData.get())
+                            ->config;
+    if (readerConfig.fileType == FileType::TURTLE) {
         auto extraInfo = reinterpret_cast<ExtraBoundCopyRdfRelInfo*>(copyFromInfo->extraInfo.get());
         srcOffsetPos = DataPos{outFSchema->getExpressionPos(*extraInfo->subjectOffset)};
         dstOffsetPos = DataPos{outFSchema->getExpressionPos(*extraInfo->objectOffset)};

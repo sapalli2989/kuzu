@@ -133,7 +133,7 @@ std::unique_ptr<BoundReadingClause> Binder::bindInQueryCall(const ReadingClause&
             fileType, std::move(filePaths), std::move(csvReaderConfig));
         readerConfig->columnTypes = std::move(columnTypes);
         readerConfig->columnNames = std::move(columnNames);
-        tableFuncBindInput = std::make_unique<ParquetScanBindInput>(
+        tableFuncBindInput = std::make_unique<function::ScanTableFuncBindInput>(
             std::move(inputValues), *readerConfig, memoryManager);
     } else {
         tableFuncBindInput = std::make_unique<function::TableFuncBindInput>(std::move(inputValues));
@@ -193,8 +193,28 @@ std::unique_ptr<BoundReadingClause> Binder::bindLoadFrom(
         }
         columns = createColumnExpressions(*readerConfig, expectedColumnNames, expectedColumnTypes);
     }
-    auto info = std::make_unique<BoundFileScanInfo>(
-        std::move(readerConfig), std::move(columns), nullptr /* offset */, TableType::UNKNOWN);
+    auto inputType = std::make_unique<LogicalType>(LogicalTypeID::STRING);
+    std::vector<LogicalType*> inputTypes;
+    inputTypes.push_back(inputType.get());
+    function::TableFunction* copyTableFunc;
+    switch (readerConfig->fileType) {
+    case common::FileType::PARQUET:
+        copyTableFunc = reinterpret_cast<function::TableFunction*>(
+            catalog.getBuiltInFunctions()->matchScalarFunction(
+                READ_PARQUET_FUNC_NAME, std::move(inputTypes)));
+        break;
+    default:
+        KU_UNREACHABLE;
+    }
+    std::vector<std::unique_ptr<Value>> inputValues;
+    inputValues.push_back(std::make_unique<Value>(Value::createValue(readerConfig->filePaths[0])));
+    std::unique_ptr<function::TableFuncBindInput> tableFuncBindInput =
+        std::make_unique<function::ScanTableFuncBindInput>(
+            std::move(inputValues), *readerConfig, memoryManager);
+    auto bindData = copyTableFunc->bindFunc(
+        clientContext, tableFuncBindInput.get(), catalog.getReadOnlyVersion());
+    auto info = std::make_unique<BoundFileScanInfo>(copyTableFunc, std::move(bindData),
+        std::move(columns), nullptr /* offset */, TableType::UNKNOWN);
     auto boundLoadFrom = std::make_unique<BoundLoadFrom>(std::move(info));
     if (loadFrom.hasWherePredicate()) {
         auto wherePredicate = expressionBinder.bindExpression(*loadFrom.getWherePredicate());
