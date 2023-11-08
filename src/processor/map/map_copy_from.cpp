@@ -1,11 +1,11 @@
 #include "binder/copy/bound_copy_from.h"
 #include "catalog/node_table_schema.h"
 #include "planner/operator/persistent/logical_copy_from.h"
+#include "processor/operator/call/in_query_call.h"
 #include "processor/operator/partitioner.h"
 #include "processor/operator/persistent/copy_node.h"
 #include "processor/operator/persistent/copy_rdf_resource.h"
 #include "processor/operator/persistent/copy_rel.h"
-#include "processor/operator/persistent/reader.h"
 #include "processor/plan_mapper.h"
 
 using namespace kuzu::binder;
@@ -26,7 +26,7 @@ std::unique_ptr<PhysicalOperator> PlanMapper::mapCopyFrom(LogicalOperator* logic
         return mapCopyRelFrom(logicalOperator);
         // LCOV_EXCL_START
     default:
-        throw NotImplementedException{"PlanMapper::mapCopy"};
+        KU_UNREACHABLE;
     }
     // LCOV_EXCL_STOP
 }
@@ -38,11 +38,10 @@ std::unique_ptr<PhysicalOperator> PlanMapper::mapCopyNodeFrom(LogicalOperator* l
     auto tableSchema = (catalog::NodeTableSchema*)copyFromInfo->tableSchema;
     // Map reader.
     auto prevOperator = mapOperator(copyFrom->getChild(0).get());
-    auto reader = reinterpret_cast<Reader*>(prevOperator.get());
+    auto inQueryCall = reinterpret_cast<InQueryCall*>(prevOperator.get());
     // Map copy node.
     auto nodeTable = storageManager.getNodeTable(tableSchema->tableID);
-    auto sharedState =
-        std::make_shared<CopyNodeSharedState>(reader->getSharedState()->getNumRowsRef());
+    auto sharedState = std::make_shared<CopyNodeSharedState>(inQueryCall->getSharedState());
     sharedState->wal = storageManager.getWAL();
     sharedState->table = nodeTable;
     for (auto& property : tableSchema->getProperties()) {

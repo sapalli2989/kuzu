@@ -577,7 +577,7 @@ std::unique_ptr<function::SharedTableFuncState> ParquetScanFunction::initSharedS
 
 bool parquetSharedStateNext(
     ParquetScanLocalState& localState, ParquetScanSharedState& sharedState) {
-    std::lock_guard<std::mutex> lock(sharedState.lock);
+    std::lock_guard<std::mutex> mtx{sharedState.lock};
     while (true) {
         if (sharedState.fileIdx >= sharedState.readerConfig.getNumFiles()) {
             return false;

@@ -51,6 +51,8 @@ public:
             inQueryCallInfo->copy(), sharedState, operatorType, id, paramsString);
     }
 
+    inline InQueryCallSharedState* getSharedState() { return sharedState.get(); }
+
 protected:
     std::unique_ptr<InQueryCallInfo> inQueryCallInfo;
     std::shared_ptr<InQueryCallSharedState> sharedState;

@@ -3,6 +3,7 @@
 #include "common/exception/copy.h"
 #include "common/exception/message.h"
 #include "common/string_format.h"
+#include "processor/operator/persistent/reader/parquet/parquet_reader.h"
 #include "processor/result/factorized_table.h"
 #include "storage/store/string_column_chunk.h"
 
@@ -20,7 +21,9 @@ void CopyNodeSharedState::init() {
         pkIndex = std::make_unique<PrimaryKeyIndexBuilder>(indexFName, *pkType);
         // Since hashIndexBuilder doesn't support dynamic rehash, we need to reserve enough number
         // of slots when copying turtle files.
-        pkIndex->bulkReserve(numRows);
+        auto sharedState =
+            reinterpret_cast<ParquetScanSharedState*>(readerSharedState->sharedState.get());
+        pkIndex->bulkReserve(sharedState->numRows);
     }
     wal->logCopyTableRecord(table->getTableID(), TableType::NODE);
     wal->flushAllPages();

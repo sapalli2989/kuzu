@@ -700,15 +700,15 @@ TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
 TEST_F(EmptyDBTest, dsad) {
     createDBAndConn();
     ASSERT_TRUE(
-        conn->query("create node table person(id int64, name string, a int64[], primary key(id))")
+        conn->query("create node table tableOfTypes (id INT64, int64Column INT64, doubleColumn "
+                    "DOUBLE, booleanColumn BOOLEAN, dateColumn DATE, stringColumn STRING, "
+                    "listOfInt64 INT64[], listOfString STRING[], listOfListOfInt64 INT64[][], "
+                    "structColumn STRUCT(ID int64, name STRING), PRIMARY KEY (id));")
             ->isSuccess());
-    ASSERT_TRUE(conn->query("load from "
-                            "'/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/"
-                            "compression/zstd.parquet' return *")
-                    ->isSuccess());
-    printf("%s", conn->query("load from "
-                             "'/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/"
-                             "compression/zstd.parquet' return *")
+
+    printf("%s", conn->query("profile COPY tableOfTypes FROM "
+                             "\"/Users/z473chen/Desktop/code/kuzu/dataset/copy-test/node/parquet/"
+                             "types_50k*.parquet\" (HEADER=true);")
                      ->toString()
                      .c_str());
 }
