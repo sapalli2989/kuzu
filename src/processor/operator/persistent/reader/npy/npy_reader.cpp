@@ -242,5 +242,23 @@ void NpyScanFunction::tableFunc(TableFunctionInput& input, DataChunk& outputChun
 
 }
 
+std::unique_ptr<function::TableFuncBindData> NpyScanFunction::bindFunc(
+    main::ClientContext* /*context*/, function::TableFuncBindInput* input,
+    catalog::CatalogContent* /*catalog*/) {
+    auto bindInput = reinterpret_cast<function::ScanTableFuncBindInput*>(input);
+    auto config = bindInput->config;
+    KU_ASSERT(!config.filePaths.empty() && config.getNumFiles() == config.getNumColumns());
+    row_idx_t numRows;
+    for (auto i = 0u; i < config.getNumFiles(); i++) {
+        auto reader = make_unique<NpyReader>(config.filePaths[i]);
+        if (i == 0) {
+            numRows = reader->getNumRows();
+        }
+        reader->validate(*config.columnTypes[i], numRows);
+    }
+    return std::make_unique<function::ScanBindData>(
+        common::LogicalType::copy(config.columnTypes), config.columnNames, config, bindInput->mm);
+}
+
 } // namespace processor
 } // namespace kuzu

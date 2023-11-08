@@ -67,8 +67,8 @@ struct NpyScanBindInput final : public function::TableFuncBindInput {
 };
 
 struct NpyScanSharedState final : public function::ScanSharedTableFuncState {
-    explicit NpyScanSharedState(const common::ReaderConfig readerConfig)
-        : ScanSharedTableFuncState{std::move(readerConfig)} {
+    explicit NpyScanSharedState(const common::ReaderConfig readerConfig, uint64_t numRows)
+        : ScanSharedTableFuncState{std::move(readerConfig), numRows} {
         npyMultiFileReader = std::make_unique<NpyMultiFileReader>(this->readerConfig.filePaths);
     }
 
@@ -82,32 +82,17 @@ public:
     static void tableFunc(function::TableFunctionInput& input, common::DataChunk& outputChunk);
 
     static std::unique_ptr<function::TableFuncBindData> bindFunc(main::ClientContext* /*context*/,
-        function::TableFuncBindInput* input, catalog::CatalogContent* catalog) {
-        auto bindInput = reinterpret_cast<function::ScanTableFuncBindInput*>(input);
-        (!config.filePaths.empty() && config.getNumFiles() == config.getNumColumns());
-        row_idx_t numRows;
-        for (auto i = 0u; i < config.getNumFiles(); i++) {
-            auto reader = make_unique<NpyReader>(config.filePaths[i]);
-            if (i == 0) {
-                numRows = reader->getNumRows();
-            }
-            reader->validate(*config.columnTypes[i], numRows);
-        }
-        auto parquetScanBindInput = reinterpret_cast<NpyScanBindInput*>(input);
-        return std::make_unique<function::ScanBindData>(
-            common::LogicalType::copy(parquetScanBindInput->config.columnTypes),
-            parquetScanBindInput->config.columnNames, parquetScanBindInput->config,
-            parquetScanBindInput->mm);
-    }
+        function::TableFuncBindInput* input, catalog::CatalogContent* catalog);
 
     static std::unique_ptr<function::SharedTableFuncState> initSharedState(
         function::TableFunctionInitInput& input) {
         auto bindData = reinterpret_cast<function::ScanBindData*>(input.bindData);
-        return std::make_unique<NpyScanSharedState>(bindData->config);
+        auto reader = make_unique<NpyReader>(bindData->config.filePaths[0]);
+        return std::make_unique<NpyScanSharedState>(bindData->config, reader->getNumRows());
     }
 
     static std::unique_ptr<function::LocalTableFuncState> initLocalState(
-        function::TableFunctionInitInput& input, function::SharedTableFuncState* state) {
+        function::TableFunctionInitInput& /*input*/, function::SharedTableFuncState* /*state*/) {
         return std::make_unique<function::LocalTableFuncState>();
     }
 };

@@ -572,7 +572,7 @@ std::unique_ptr<function::SharedTableFuncState> ParquetScanFunction::initSharedS
         numRows += reader->getMetadata()->num_rows;
     }
     return std::make_unique<ParquetScanSharedState>(
-        parquetScanBindData->config, parquetScanBindData->mm);
+        parquetScanBindData->config, parquetScanBindData->mm, numRows);
 }
 
 bool parquetSharedStateNext(

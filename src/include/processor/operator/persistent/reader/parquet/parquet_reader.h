@@ -94,9 +94,9 @@ private:
 
 class ParquetScanSharedState final : public function::ScanSharedTableFuncState {
 public:
-    explicit ParquetScanSharedState(
-        const common::ReaderConfig readerConfig, storage::MemoryManager* memoryManager)
-        : ScanSharedTableFuncState{std::move(readerConfig)}, memoryManager{memoryManager} {
+    explicit ParquetScanSharedState(const common::ReaderConfig readerConfig,
+        storage::MemoryManager* memoryManager, uint64_t numRows)
+        : ScanSharedTableFuncState{std::move(readerConfig), numRows}, memoryManager{memoryManager} {
         readers.push_back(
             std::make_unique<ParquetReader>(this->readerConfig.filePaths[fileIdx], memoryManager));
     }

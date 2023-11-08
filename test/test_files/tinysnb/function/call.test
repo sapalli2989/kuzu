@@ -81,8 +81,11 @@ height
 ---- 1
 v0.0.12.1
 
+
+// copy person from 'a.csv'
+// CALL FUNCTION -> COPY -> RESULT COLLECTOR;
 -LOG CopyParquet
--STATEMENT CALL READ_PARQUET("/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/compression/gzip.parquet") RETURN *
+-STATEMENT CALL READ_PARQUET("/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/compression/gzip.parquet",delim=',',) RETURN *
 ---- 3
 
 

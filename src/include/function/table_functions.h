@@ -29,9 +29,15 @@ struct ScanSharedTableFuncState : public SharedTableFuncState {
     uint64_t fileIdx;
     uint64_t blockIdx;
     const common::ReaderConfig readerConfig;
+    uint64_t numRows;
 
-    ScanSharedTableFuncState(const common::ReaderConfig readerConfig)
-        : fileIdx{0}, blockIdx{0}, readerConfig{std::move(readerConfig)} {}
+    ScanSharedTableFuncState(const common::ReaderConfig readerConfig, uint64_t numRows)
+        : fileIdx{0}, blockIdx{0}, readerConfig{std::move(readerConfig)}, numRows{numRows} {}
+
+    uint64_t getNext() {
+        std::lock_guard<std::mutex> guard{lock};
+        return blockIdx++;
+    }
 };
 
 struct LocalTableFuncState {
