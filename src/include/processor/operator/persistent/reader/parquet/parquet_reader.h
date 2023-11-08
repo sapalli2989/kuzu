@@ -92,61 +92,38 @@ private:
     storage::MemoryManager* memoryManager;
 };
 
-struct ParquetScanBindData : public function::TableFuncBindData {
-    ParquetScanBindData(std::vector<std::unique_ptr<common::LogicalType>> returnTypes,
-        std::vector<std::string> returnColumnNames, const common::ReaderConfig* config,
-        storage::MemoryManager* mm)
-        : TableFuncBindData{std::move(returnTypes), std::move(returnColumnNames)}, config{config},
-          mm{mm} {}
-
-    const common::ReaderConfig* config;
-    storage::MemoryManager* mm;
-
-    std::unique_ptr<TableFuncBindData> copy() override {
-        return std::make_unique<ParquetScanBindData>(
-            common::LogicalType::copy(returnTypes), returnColumnNames, config, mm);
-    }
-};
-
-class ParquetScanSharedState final : public function::SharedTableFuncState {
+class ParquetScanSharedState final : public function::ScanSharedTableFuncState {
 public:
     explicit ParquetScanSharedState(
-        const common::ReaderConfig* readerConfig, storage::MemoryManager* memoryManager)
-        : fileIdx{0}, groupIdx{0}, memoryManager{memoryManager} {
+        const common::ReaderConfig readerConfig, storage::MemoryManager* memoryManager)
+        : ScanSharedTableFuncState{std::move(readerConfig)}, memoryManager{memoryManager} {
         readers.push_back(
-            std::make_unique<ParquetReader>(readerConfig->filePaths[fileIdx], memoryManager));
+            std::make_unique<ParquetReader>(this->readerConfig.filePaths[fileIdx], memoryManager));
     }
 
     std::vector<std::unique_ptr<ParquetReader>> readers;
-
-    std::mutex lock;
-    uint64_t fileIdx;
-    uint64_t groupIdx;
-    const common::ReaderConfig* readerConfig;
     storage::MemoryManager* memoryManager;
 };
 
 struct ParquetScanLocalState final : public function::LocalTableFuncState {
+    ParquetScanLocalState() { state = std::make_unique<ParquetReaderScanState>(); }
+
     ParquetReader* reader = nullptr;
     std::unique_ptr<ParquetReaderScanState> state = nullptr;
 };
 
-struct ParquetScanBindInput final : public function::TableFuncBindInput {
-    const common::ReaderConfig* config;
-    storage::MemoryManager* mm;
-};
-
 class ParquetScanFunction {
+public:
     static function::function_set getFunctionSet();
 
     static void tableFunc(function::TableFunctionInput& input, common::DataChunk& outputChunk);
 
     static std::unique_ptr<function::TableFuncBindData> bindFunc(main::ClientContext* /*context*/,
         function::TableFuncBindInput* input, catalog::CatalogContent* catalog) {
-        auto parquetScanBindInput = reinterpret_cast<ParquetScanBindInput*>(input);
-        return std::make_unique<ParquetScanBindData>(
-            common::LogicalType::copy(parquetScanBindInput->config->columnTypes),
-            parquetScanBindInput->config->columnNames, parquetScanBindInput->config,
+        auto parquetScanBindInput = reinterpret_cast<function::ScanTableFuncBindInput*>(input);
+        return std::make_unique<function::ScanBindData>(
+            common::LogicalType::copy(parquetScanBindInput->config.columnTypes),
+            parquetScanBindInput->config.columnNames, parquetScanBindInput->config,
             parquetScanBindInput->mm);
     }
 

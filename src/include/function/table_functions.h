@@ -24,6 +24,16 @@ struct SharedTableFuncState {
     virtual ~SharedTableFuncState() = default;
 };
 
+struct ScanSharedTableFuncState : public SharedTableFuncState {
+    std::mutex lock;
+    uint64_t fileIdx;
+    uint64_t blockIdx;
+    const common::ReaderConfig readerConfig;
+
+    ScanSharedTableFuncState(const common::ReaderConfig readerConfig)
+        : fileIdx{0}, blockIdx{0}, readerConfig{std::move(readerConfig)} {}
+};
+
 struct LocalTableFuncState {
     virtual ~LocalTableFuncState() = default;
 };

@@ -557,16 +557,17 @@ uint64_t ParquetReader::getGroupOffset(ParquetReaderScanState& state) {
 
 function_set ParquetScanFunction::getFunctionSet() {
     function_set functionSet;
-    functionSet.push_back(std::make_unique<TableFunction>("copy_csv", tableFunc, bindFunc,
-        initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    functionSet.push_back(
+        std::make_unique<TableFunction>(READ_PARQUET_FUNC_NAME, tableFunc, bindFunc,
+            initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
     return functionSet;
 }
 
 std::unique_ptr<function::SharedTableFuncState> ParquetScanFunction::initSharedState(
     TableFunctionInitInput& input) {
-    auto parquetScanBindData = reinterpret_cast<ParquetScanBindData*>(input.bindData);
+    auto parquetScanBindData = reinterpret_cast<ScanBindData*>(input.bindData);
     row_idx_t numRows = 0;
-    for (const auto& path : parquetScanBindData->config->filePaths) {
+    for (const auto& path : parquetScanBindData->config.filePaths) {
         auto reader = std::make_unique<ParquetReader>(path, parquetScanBindData->mm);
         numRows += reader->getMetadata()->num_rows;
     }
@@ -578,22 +579,22 @@ bool parquetSharedStateNext(
     ParquetScanLocalState& localState, ParquetScanSharedState& sharedState) {
     std::lock_guard<std::mutex> lock(sharedState.lock);
     while (true) {
-        if (sharedState.fileIdx >= sharedState.readerConfig->getNumFiles()) {
+        if (sharedState.fileIdx >= sharedState.readerConfig.getNumFiles()) {
             return false;
         }
-        if (sharedState.groupIdx < sharedState.readers[sharedState.fileIdx]->getNumRowsGroups()) {
+        if (sharedState.blockIdx < sharedState.readers[sharedState.fileIdx]->getNumRowsGroups()) {
             localState.reader = sharedState.readers[sharedState.fileIdx].get();
-            localState.reader->initializeScan(*localState.state, {sharedState.groupIdx});
-            sharedState.groupIdx++;
+            localState.reader->initializeScan(*localState.state, {sharedState.blockIdx});
+            sharedState.blockIdx++;
             return true;
         } else {
-            sharedState.groupIdx = 0;
+            sharedState.blockIdx = 0;
             sharedState.fileIdx++;
-            if (sharedState.fileIdx >= sharedState.readerConfig->getNumFiles()) {
+            if (sharedState.fileIdx >= sharedState.readerConfig.getNumFiles()) {
                 return false;
             }
             sharedState.readers.push_back(std::make_unique<ParquetReader>(
-                sharedState.readerConfig->filePaths[sharedState.fileIdx],
+                sharedState.readerConfig.filePaths[sharedState.fileIdx],
                 sharedState.memoryManager));
             continue;
         }
@@ -601,7 +602,7 @@ bool parquetSharedStateNext(
 }
 
 std::unique_ptr<function::LocalTableFuncState> ParquetScanFunction::initLocalState(
-    TableFunctionInitInput& input, SharedTableFuncState* state) {
+    TableFunctionInitInput& /*input*/, SharedTableFuncState* state) {
     auto parquetScanSharedState = reinterpret_cast<ParquetScanSharedState*>(state);
     auto localState = std::make_unique<ParquetScanLocalState>();
     if (!parquetSharedStateNext(*localState, *parquetScanSharedState)) {

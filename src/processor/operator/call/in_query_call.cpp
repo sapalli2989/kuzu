@@ -27,6 +27,8 @@ void InQueryCall::initGlobalStateInternal(ExecutionContext* /*context*/) {
 bool InQueryCall::getNextTuplesInternal(ExecutionContext* /*context*/) {
     function::TableFunctionInput tableFunctionInput{inQueryCallInfo->bindData.get(),
         localState->localState.get(), sharedState->sharedState.get()};
+    localState->outputChunk->state->selVector->selectedSize = 0;
+    localState->outputChunk->resetAuxiliaryBuffer();
     inQueryCallInfo->function->tableFunc(tableFunctionInput, *localState->outputChunk);
     return localState->outputChunk->state->selVector->selectedSize != 0;
 }

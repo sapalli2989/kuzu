@@ -18,5 +18,21 @@ struct TableFuncBindData {
     virtual std::unique_ptr<TableFuncBindData> copy() = 0;
 };
 
+struct ScanBindData : public function::TableFuncBindData {
+    ScanBindData(std::vector<std::unique_ptr<common::LogicalType>> returnTypes,
+        std::vector<std::string> returnColumnNames, const common::ReaderConfig config,
+        storage::MemoryManager* mm)
+        : TableFuncBindData{std::move(returnTypes), std::move(returnColumnNames)}, config{config},
+          mm{mm} {}
+
+    const common::ReaderConfig config;
+    storage::MemoryManager* mm;
+
+    std::unique_ptr<TableFuncBindData> copy() override {
+        return std::make_unique<ScanBindData>(
+            common::LogicalType::copy(returnTypes), returnColumnNames, config, mm);
+    }
+};
+
 } // namespace function
 } // namespace kuzu

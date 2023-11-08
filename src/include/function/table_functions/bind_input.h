@@ -13,5 +13,13 @@ struct TableFuncBindInput {
     std::vector<std::unique_ptr<common::Value>> inputs;
 };
 
+struct ScanTableFuncBindInput final : public function::TableFuncBindInput {
+    ScanTableFuncBindInput(std::vector<std::unique_ptr<common::Value>> inputValues,
+        const common::ReaderConfig config, storage::MemoryManager* mm)
+        : TableFuncBindInput{std::move(inputValues)}, config{config}, mm{mm} {}
+    const common::ReaderConfig config;
+    storage::MemoryManager* mm;
+};
+
 } // namespace function
 } // namespace kuzu

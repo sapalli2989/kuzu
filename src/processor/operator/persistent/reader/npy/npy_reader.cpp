@@ -21,6 +21,7 @@
 
 using namespace kuzu::common;
 using namespace kuzu::storage;
+using namespace kuzu::function;
 
 namespace kuzu {
 namespace processor {
@@ -228,6 +229,17 @@ void NpyMultiFileReader::readBlock(block_idx_t blockIdx, common::DataChunk* data
     for (auto i = 0u; i < fileReaders.size(); i++) {
         fileReaders[i]->readBlock(blockIdx, dataChunkToRead->getValueVector(i).get());
     }
+}
+
+function_set NpyScanFunction::getFunctionSet() {
+    function_set functionSet;
+    functionSet.push_back(std::make_unique<TableFunction>(READ_NPY_FUNC_NAME, tableFunc, bindFunc,
+        initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    return functionSet;
+}
+
+void NpyScanFunction::tableFunc(TableFunctionInput& input, DataChunk& outputChunk) {
+
 }
 
 } // namespace processor

@@ -81,6 +81,13 @@ height
 ---- 1
 v0.0.12.1
 
+-LOG CopyParquet
+-STATEMENT CALL READ_PARQUET("/Users/z473chen/Desktop/code/kuzu/dataset/reader/parquet/compression/gzip.parquet") RETURN *
+---- 3
+
+
+
+
 -LOG ReturnTableConnection
 -STATEMENT CALL show_connection('knows') RETURN *
 ---- 1

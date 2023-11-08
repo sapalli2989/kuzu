@@ -22,6 +22,7 @@
 #include "function/table_functions/copy_parquet.h"
 #include "function/timestamp/vector_timestamp_functions.h"
 #include "function/union/vector_union_functions.h"
+#include "processor/operator/persistent/reader/parquet/parquet_reader.h"
 
 using namespace kuzu::common;
 
@@ -755,6 +756,7 @@ void BuiltInFunctions::registerTableFunctions() {
     functions.insert({SHOW_TABLES_FUNC_NAME, ShowTablesFunction::getFunctionSet()});
     functions.insert({TABLE_INFO_FUNC_NAME, TableInfoFunction::getFunctionSet()});
     functions.insert({SHOW_CONNECTION_FUNC_NAME, ShowConnectionFunction::getFunctionSet()});
+    functions.insert({READ_PARQUET_FUNC_NAME, processor::ParquetScanFunction::getFunctionSet()});
 }
 
 void BuiltInFunctions::addFunction(std::string name, function::function_set definitions) {

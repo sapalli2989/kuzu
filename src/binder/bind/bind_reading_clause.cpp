@@ -117,8 +117,27 @@ std::unique_ptr<BoundReadingClause> Binder::bindInQueryCall(const ReadingClause&
     StringUtils::toUpper(funcNameToMatch);
     auto tableFunction = reinterpret_cast<function::TableFunction*>(
         catalog.getBuiltInFunctions()->matchScalarFunction(std::move(funcNameToMatch), inputTypes));
-    auto tableFuncBindInput =
-        std::make_unique<function::TableFuncBindInput>(std::move(inputValues));
+    std::unique_ptr<function::TableFuncBindInput> tableFuncBindInput;
+    if (tableFunction->name == READ_PARQUET_FUNC_NAME) {
+        auto csvReaderConfig = std::make_unique<CSVReaderConfig>();
+        auto filePaths = bindFilePaths({inputValues[0]->strVal});
+        auto fileType = bindFileType(inputValues[0]->strVal);
+        std::vector<std::string> columnNames = {"a", "b", "c"};
+        std::vector<std::unique_ptr<common::LogicalType>> columnTypes;
+        columnTypes.push_back(std::make_unique<LogicalType>(LogicalTypeID::INT64));
+        columnTypes.push_back(std::make_unique<LogicalType>(LogicalTypeID::STRING));
+        columnTypes.push_back(std::make_unique<LogicalType>(
+            LogicalTypeID::VAR_LIST, std::make_unique<VarListTypeInfo>(
+                                         std::make_unique<LogicalType>(LogicalTypeID::INT64))));
+        auto readerConfig = std::make_unique<ReaderConfig>(
+            fileType, std::move(filePaths), std::move(csvReaderConfig));
+        readerConfig->columnTypes = std::move(columnTypes);
+        readerConfig->columnNames = std::move(columnNames);
+        tableFuncBindInput = std::make_unique<ParquetScanBindInput>(
+            std::move(inputValues), *readerConfig, memoryManager);
+    } else {
+        tableFuncBindInput = std::make_unique<function::TableFuncBindInput>(std::move(inputValues));
+    }
     auto bindData = tableFunction->bindFunc(
         clientContext, tableFuncBindInput.get(), catalog.getReadOnlyVersion());
     expression_vector outputExpressions;
