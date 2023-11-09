@@ -80,12 +80,14 @@ typedef std::unique_ptr<SharedTableFuncState> (*table_func_init_shared_t)(
     TableFunctionInitInput& input);
 typedef std::unique_ptr<LocalTableFuncState> (*table_func_init_local_t)(
     TableFunctionInitInput& input, SharedTableFuncState* state);
+typedef bool (*table_func_can_parallel_t)();
 
 struct TableFunction : public Function {
     table_func_t tableFunc;
     table_func_bind_t bindFunc;
     table_func_init_shared_t initSharedStateFunc;
     table_func_init_local_t initLocalStateFunc;
+    table_func_can_parallel_t canParallelFunc = [] { return true; };
 
     TableFunction(std::string name, table_func_t tableFunc, table_func_bind_t bindFunc,
         table_func_init_shared_t initSharedFunc, table_func_init_local_t initLocalFunc,

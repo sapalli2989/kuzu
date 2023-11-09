@@ -281,8 +281,10 @@ offset_t RDFReader::read(DataChunk* dataChunk) {
 
 function::function_set RDFScan::getFunctionSet() {
     function_set functionSet;
-    functionSet.push_back(std::make_unique<TableFunction>(READ_RDF_FUNC_NAME, tableFunc, bindFunc,
-        initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    auto func = std::make_unique<TableFunction>(READ_RDF_FUNC_NAME, tableFunc, bindFunc,
+        initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING});
+    func->canParallelFunc = [] { return false; };
+    functionSet.push_back(std::move(func));
     return functionSet;
 }
 
