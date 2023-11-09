@@ -697,21 +697,5 @@ TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
     renameProperty(TransactionTestType::RECOVERY);
 }
 
-TEST_F(EmptyDBTest, dsad) {
-    createDBAndConn();
-    ASSERT_TRUE(
-        conn->query("create node table tableOfTypes (id INT64, int64Column INT64, doubleColumn "
-                    "DOUBLE, booleanColumn BOOLEAN, dateColumn DATE, stringColumn STRING, "
-                    "listOfInt64 INT64[], listOfString STRING[], listOfListOfInt64 INT64[][], "
-                    "structColumn STRUCT(ID int64, name STRING), PRIMARY KEY (id));")
-            ->isSuccess());
-
-    printf("%s", conn->query("profile COPY tableOfTypes FROM "
-                             "\"/Users/z473chen/Desktop/code/kuzu/dataset/copy-test/node/parquet/"
-                             "types_50k*.parquet\" (HEADER=true);")
-                     ->toString()
-                     .c_str());
-}
-
 } // namespace testing
 } // namespace kuzu

@@ -13,6 +13,7 @@ void InQueryCall::initLocalStateInternal(ResultSet* resultSet, ExecutionContext*
         localState->outputChunk->insert(
             i, resultSet->getValueVector(inQueryCallInfo->outputPoses[i]));
     }
+    localState->rowIDVector = resultSet->getValueVector(inQueryCallInfo->rowIDPos).get();
     function::TableFunctionInitInput tableFunctionInitInput{inQueryCallInfo->bindData.get()};
     localState->localState = inQueryCallInfo->function->initLocalStateFunc(
         tableFunctionInitInput, sharedState->sharedState.get());
@@ -30,6 +31,11 @@ bool InQueryCall::getNextTuplesInternal(ExecutionContext* /*context*/) {
     localState->outputChunk->state->selVector->selectedSize = 0;
     localState->outputChunk->resetAuxiliaryBuffer();
     inQueryCallInfo->function->tableFunc(tableFunctionInput, *localState->outputChunk);
+    auto numRowsToOutput = localState->outputChunk->state->selVector->selectedSize;
+    auto rowIdx = sharedState->getAndIncreaseRowIdx(numRowsToOutput);
+    for (auto i = 0u; i < numRowsToOutput; i++) {
+        localState->rowIDVector->setValue(i, rowIdx + i);
+    }
     return localState->outputChunk->state->selVector->selectedSize != 0;
 }
 

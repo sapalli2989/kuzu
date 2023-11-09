@@ -12,6 +12,7 @@
 #include "processor/operator/persistent/reader/csv/driver.h"
 
 using namespace kuzu::common;
+using namespace kuzu::function;
 
 namespace kuzu {
 namespace processor {
@@ -101,6 +102,48 @@ bool ParallelCSVReader::finishedBlock() const {
     // Only stop if we've ventured into the next block by at least a byte.
     // Use `>` because `position` points to just past the newline right now.
     return getFileOffset() > (currentBlockIdx + 1) * CopyConstants::PARALLEL_BLOCK_SIZE;
+}
+
+function::function_set ParallelCSVScan::getFunctionSet() {
+    function_set functionSet;
+    functionSet.push_back(
+        std::make_unique<TableFunction>(READ_CSV_PARALLEL_FUNC_NAME, tableFunc, bindFunc,
+            initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    return functionSet;
+}
+
+void ParallelCSVScan::tableFunc(TableFunctionInput& input, common::DataChunk& outputChunk) {
+    auto parallelCSVLocalState = reinterpret_cast<ParallelCSVLocalState*>(input.localState);
+    auto parallelCSVSharedState = reinterpret_cast<ParallelCSVScanSharedState*>(input.sharedState);
+    do {
+        if (parallelCSVLocalState->reader != nullptr &&
+            parallelCSVLocalState->reader->hasMoreToRead()) {
+            auto result = parallelCSVLocalState->reader->continueBlock(outputChunk);
+            outputChunk.state->selVector->selectedSize = result;
+            if (result > 0) {
+                return;
+            }
+        }
+        auto [fileIdx, blockIdx] = parallelCSVSharedState->getNext();
+        if (fileIdx == UINT64_MAX) {
+            return;
+        }
+        if (fileIdx != parallelCSVLocalState->fileIdx) {
+            parallelCSVLocalState->fileIdx = fileIdx;
+            parallelCSVLocalState->reader = std::make_unique<ParallelCSVReader>(
+                parallelCSVSharedState->readerConfig.filePaths[fileIdx],
+                parallelCSVSharedState->readerConfig);
+        }
+        auto numRowsRead = parallelCSVLocalState->reader->parseBlock(blockIdx, outputChunk);
+        outputChunk.state->selVector->selectedSize = numRowsRead;
+        if (numRowsRead > 0) {
+            return;
+        }
+        if (parallelCSVLocalState->reader->isEOF()) {
+            parallelCSVSharedState->moveToNextFile(parallelCSVLocalState->fileIdx);
+            parallelCSVLocalState->reader = nullptr;
+        }
+    } while (true);
 }
 
 } // namespace processor

@@ -9,10 +9,21 @@ namespace processor {
 
 struct InQueryCallSharedState {
     std::unique_ptr<function::SharedTableFuncState> sharedState;
+
+    common::row_idx_t getAndIncreaseRowIdx(uint64_t numRows) {
+        std::lock_guard lock{mtx};
+        auto curRowIdx = nextRowIdx;
+        nextRowIdx += numRows;
+        return curRowIdx;
+    }
+
+    common::row_idx_t nextRowIdx = 0;
+    std::mutex mtx;
 };
 
 struct InQueryCallLocalState {
     std::unique_ptr<common::DataChunk> outputChunk;
+    common::ValueVector* rowIDVector;
     std::unique_ptr<function::LocalTableFuncState> localState;
 };
 
@@ -20,13 +31,16 @@ struct InQueryCallInfo {
     function::TableFunction* function;
     std::unique_ptr<function::TableFuncBindData> bindData;
     std::vector<DataPos> outputPoses;
+    DataPos rowIDPos;
 
     InQueryCallInfo(function::TableFunction* function,
-        std::unique_ptr<function::TableFuncBindData> bindData, std::vector<DataPos> outputPoses)
-        : function{function}, bindData{std::move(bindData)}, outputPoses{std::move(outputPoses)} {}
+        std::unique_ptr<function::TableFuncBindData> bindData, std::vector<DataPos> outputPoses,
+        DataPos rowIDPos)
+        : function{function}, bindData{std::move(bindData)},
+          outputPoses{std::move(outputPoses)}, rowIDPos{std::move(rowIDPos)} {}
 
     std::unique_ptr<InQueryCallInfo> copy() {
-        return std::make_unique<InQueryCallInfo>(function, bindData->copy(), outputPoses);
+        return std::make_unique<InQueryCallInfo>(function, bindData->copy(), outputPoses, rowIDPos);
     }
 };
 

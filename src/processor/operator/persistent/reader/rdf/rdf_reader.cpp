@@ -15,6 +15,7 @@
 using namespace kuzu::common;
 using namespace kuzu::storage;
 using namespace kuzu::common::rdf;
+using namespace kuzu::function;
 
 namespace kuzu {
 namespace processor {
@@ -276,6 +277,18 @@ offset_t RDFReader::read(DataChunk* dataChunk) {
     }
     dataChunk->state->selVector->selectedSize = vectorSize;
     return rowOffset;
+}
+
+function::function_set RDFScan::getFunctionSet() {
+    function_set functionSet;
+    functionSet.push_back(std::make_unique<TableFunction>(READ_RDF_FUNC_NAME, tableFunc, bindFunc,
+        initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    return functionSet;
+}
+
+void RDFScan::tableFunc(function::TableFunctionInput& input, common::DataChunk& outputChunk) {
+    auto localState = reinterpret_cast<RDFScanLocalState*>(input.localState);
+    localState->reader->read(&outputChunk);
 }
 
 } // namespace processor

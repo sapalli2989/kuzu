@@ -34,9 +34,20 @@ struct ScanSharedTableFuncState : public SharedTableFuncState {
     ScanSharedTableFuncState(const common::ReaderConfig readerConfig, uint64_t numRows)
         : fileIdx{0}, blockIdx{0}, readerConfig{std::move(readerConfig)}, numRows{numRows} {}
 
-    uint64_t getNext() {
+    std::pair<uint64_t, uint64_t> getNext() {
         std::lock_guard<std::mutex> guard{lock};
-        return blockIdx++;
+        if (fileIdx >= readerConfig.getNumFiles()) {
+            return {UINT64_MAX, UINT64_MAX};
+        }
+        return {fileIdx, blockIdx++};
+    }
+
+    void moveToNextFile(uint64_t completedFileIdx) {
+        std::lock_guard<std::mutex> guard{lock};
+        if (completedFileIdx == fileIdx) {
+            blockIdx = 0;
+            fileIdx++;
+        }
     }
 };
 

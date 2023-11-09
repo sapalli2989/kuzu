@@ -4,6 +4,7 @@
 #include "processor/operator/persistent/reader/csv/driver.h"
 
 using namespace kuzu::common;
+using namespace kuzu::function;
 
 namespace kuzu {
 namespace processor {
@@ -39,6 +40,19 @@ uint64_t SerialCSVReader::parseBlock(common::block_idx_t blockIdx, common::DataC
     }
     SerialParsingDriver driver(resultChunk, this);
     return parseCSV(driver);
+}
+
+function_set SerialCSVScan::getFunctionSet() {
+    function_set functionSet;
+    functionSet.push_back(
+        std::make_unique<TableFunction>(READ_CSV_SERIAL_FUNC_NAME, tableFunc, bindFunc,
+            initSharedState, initLocalState, std::vector<LogicalTypeID>{LogicalTypeID::STRING}));
+    return functionSet;
+}
+
+void SerialCSVScan::tableFunc(TableFunctionInput& input, DataChunk& outputChunk) {
+    auto serialCSVScanSharedState = reinterpret_cast<SerialCSVScanSharedState*>(input.sharedState);
+    serialCSVScanSharedState->read(outputChunk);
 }
 
 } // namespace processor

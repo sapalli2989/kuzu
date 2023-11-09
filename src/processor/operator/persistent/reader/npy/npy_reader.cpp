@@ -1,4 +1,4 @@
-#include "processor/operator/persistent/reader/npy_reader.h"
+#include "processor/operator/persistent/reader/npy/npy_reader.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -240,7 +240,7 @@ function_set NpyScanFunction::getFunctionSet() {
 
 void NpyScanFunction::tableFunc(TableFunctionInput& input, DataChunk& outputChunk) {
     auto sharedState = reinterpret_cast<NpyScanSharedState*>(input.sharedState);
-    auto blockIdx = sharedState->getNext();
+    auto [_, blockIdx] = sharedState->getNext();
     sharedState->npyMultiFileReader->readBlock(blockIdx, outputChunk);
 }
 
