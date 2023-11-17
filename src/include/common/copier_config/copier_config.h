@@ -40,7 +40,14 @@ struct CSVReaderConfig : public CSVOption {
     }
 };
 
-enum class FileType : uint8_t { UNKNOWN = 0, CSV = 1, PARQUET = 2, NPY = 3, TURTLE = 4 };
+enum class FileType : uint8_t {
+    UNKNOWN = 0,
+    CSV = 1,
+    PARQUET = 2,
+    NPY = 3,
+    TURTLE = 4,
+    PANDAS = 5
+};
 
 struct FileTypeUtils {
     static FileType getFileTypeFromExtension(const std::string& extension);

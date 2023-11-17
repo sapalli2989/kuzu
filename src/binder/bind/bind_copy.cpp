@@ -1,3 +1,5 @@
+#include <regex>
+
 #include "binder/binder.h"
 #include "binder/copy/bound_copy_from.h"
 #include "binder/copy/bound_copy_to.h"
@@ -8,6 +10,7 @@
 #include "common/exception/message.h"
 #include "common/string_format.h"
 #include "function/table_functions/bind_input.h"
+#include "main/client_context.h"
 #include "parser/copy.h"
 
 using namespace kuzu::binder;
@@ -118,9 +121,24 @@ std::unique_ptr<BoundStatement> Binder::bindCopyNodeFrom(const Statement& statem
     std::vector<std::unique_ptr<common::LogicalType>> expectedColumnTypes;
     bindExpectedNodeColumns(
         tableSchema, copyStatement.getColumnNames(), expectedColumnNames, expectedColumnTypes);
-    auto bindInput = std::make_unique<function::ScanTableFuncBindInput>(
-        memoryManager, *config, std::move(expectedColumnNames), std::move(expectedColumnTypes));
-    auto bindData = func->bindFunc(clientContext, bindInput.get(), catalog.getReadOnlyVersion());
+    std::unique_ptr<function::TableFuncBindData> bindData;
+    if (config->fileType == FileType::PANDAS) {
+        std::vector<std::unique_ptr<Value>> inputValues;
+        std::regex pattern("\\(([^)]+)\\)");
+        std::smatch matches;
+        std::regex_search(config->filePaths[0], matches, pattern);
+        std::string pdName = matches[1];
+        auto filePathValue = std::make_unique<Value>(pdName.c_str());
+        auto replacedValue = clientContext->replaceFunc(filePathValue.get());
+        inputValues.push_back(std::move(replacedValue));
+        auto bindInput = std::make_unique<function::TableFuncBindInput>();
+        bindInput->inputs = std::move(inputValues);
+        bindData = func->bindFunc(clientContext, bindInput.get(), catalog.getReadOnlyVersion());
+    } else {
+        auto bindInput = std::make_unique<function::ScanTableFuncBindInput>(
+            memoryManager, *config, std::move(expectedColumnNames), std::move(expectedColumnTypes));
+        bindData = func->bindFunc(clientContext, bindInput.get(), catalog.getReadOnlyVersion());
+    }
     expression_vector columns;
     for (auto i = 0u; i < bindData->columnTypes.size(); i++) {
         columns.push_back(createVariable(bindData->columnNames[i], *bindData->columnTypes[i]));

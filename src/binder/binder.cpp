@@ -232,6 +232,11 @@ function::TableFunction* Binder::getScanFunction(common::FileType fileType, bool
         func = catalog.getBuiltInFunctions()->matchScalarFunction(
             READ_RDF_FUNC_NAME, std::move(inputTypes));
     } break;
+    case common::FileType::PANDAS: {
+        auto inputType = LogicalType::POINTER();
+        func = catalog.getBuiltInFunctions()->matchScalarFunction(
+            READ_PANDAS_FUNC_NAME, std::vector<LogicalType*>{inputType.get()});
+    } break;
     default:
         KU_UNREACHABLE;
     }

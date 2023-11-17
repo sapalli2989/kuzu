@@ -16,6 +16,9 @@ namespace binder {
  * Bind file.
  */
 FileType Binder::bindFileType(const std::string& filePath) {
+    if (filePath.starts_with(READ_PANDAS_FUNC_NAME)) {
+        return FileType::PANDAS;
+    }
     std::filesystem::path fileName(filePath);
     auto extension = FileUtils::getFileExtension(fileName);
     auto fileType = FileTypeUtils::getFileTypeFromExtension(extension);
@@ -36,6 +39,9 @@ FileType Binder::bindFileType(const std::vector<std::string>& filePaths) {
 
 std::vector<std::string> Binder::bindFilePaths(const std::vector<std::string>& filePaths) {
     std::vector<std::string> boundFilePaths;
+    if (filePaths[0].starts_with(READ_PANDAS_FUNC_NAME)) {
+        return filePaths;
+    }
     for (auto& filePath : filePaths) {
         auto globbedFilePaths = FileUtils::globFilePath(filePath);
         if (globbedFilePaths.empty()) {
