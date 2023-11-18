@@ -44,6 +44,7 @@ static std::unordered_map<std::string, std::unique_ptr<Value>> transformPythonPa
 
 std::unique_ptr<PyQueryResult> PyConnection::execute(
     PyPreparedStatement* preparedStatement, py::dict params) {
+    conn->addFunction(READ_PANDAS_FUNC_NAME, kuzu::PandasScanFunction::getFunctionSet());
     auto parameters = transformPythonParameters(params);
     py::gil_scoped_release release;
     auto queryResult =
@@ -62,6 +63,7 @@ void PyConnection::setMaxNumThreadForExec(uint64_t numThreads) {
 }
 
 PyPreparedStatement PyConnection::prepare(const std::string& query) {
+    conn->addFunction(READ_PANDAS_FUNC_NAME, kuzu::PandasScanFunction::getFunctionSet());
     auto preparedStatement = conn->prepare(query);
     PyPreparedStatement pyPreparedStatement;
     pyPreparedStatement.preparedStatement = std::move(preparedStatement);

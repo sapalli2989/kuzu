@@ -224,7 +224,9 @@ ExpressionType CatalogContent::getFunctionType(const std::string& name) const {
 
 void CatalogContent::addFunction(std::string name, function::function_set definitions) {
     StringUtils::toUpper(name);
-    builtInFunctions->addFunction(std::move(name), std::move(definitions));
+    if (!builtInFunctions->containsFunction(name)) {
+        builtInFunctions->addFunction(std::move(name), std::move(definitions));
+    }
 }
 
 void CatalogContent::addScalarMacroFunction(

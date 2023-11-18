@@ -84,10 +84,6 @@ void Database::setLoggingLevel(std::string loggingLevel) {
     spdlog::set_level(LoggingLevelUtils::convertStrToLevelEnum(std::move(loggingLevel)));
 }
 
-void Database::addFunction(std::string name, function::function_set functionSet) {
-    catalog->addFunction(std::move(name), std::move(functionSet));
-}
-
 void Database::openLockFile() {
     int flags;
     FileLockType lock;

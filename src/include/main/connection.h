@@ -112,12 +112,12 @@ public:
     KUZU_API uint64_t getQueryTimeOut();
 
     template<typename TR, typename... Args>
-    void createScalarFunction(const std::string& name, TR (*udfFunc)(Args...)) {
+    KUZU_API void createScalarFunction(const std::string& name, TR (*udfFunc)(Args...)) {
         addScalarFunction(name, std::move(function::UDF::getFunction<TR, Args...>(name, udfFunc)));
     }
 
     template<typename TR, typename... Args>
-    void createScalarFunction(const std::string& name,
+    KUZU_API void createScalarFunction(const std::string& name,
         std::vector<common::LogicalTypeID> parameterTypes, common::LogicalTypeID returnType,
         TR (*udfFunc)(Args...)) {
         addScalarFunction(name, function::UDF::getFunction<TR, Args...>(
@@ -125,21 +125,23 @@ public:
     }
 
     template<typename TR, typename... Args>
-    void createVectorizedFunction(const std::string& name, function::scalar_exec_func scalarFunc) {
+    KUZU_API void createVectorizedFunction(const std::string& name, function::scalar_exec_func scalarFunc) {
         addScalarFunction(
             name, function::UDF::getVectorizedFunction<TR, Args...>(name, std::move(scalarFunc)));
     }
 
-    void createVectorizedFunction(const std::string& name,
+    KUZU_API void createVectorizedFunction(const std::string& name,
         std::vector<common::LogicalTypeID> parameterTypes, common::LogicalTypeID returnType,
         function::scalar_exec_func scalarFunc) {
         addScalarFunction(name, function::UDF::getVectorizedFunction(name, std::move(scalarFunc),
                                     std::move(parameterTypes), returnType));
     }
 
-    inline void setReplaceFunc(replace_func_t replaceFunc) {
+    KUZU_API void setReplaceFunc(replace_func_t replaceFunc) {
         clientContext->setReplaceFunc(std::move(replaceFunc));
     }
+
+    void addFunction(std::string name, function::function_set functionSet);
 
 private:
     std::unique_ptr<QueryResult> query(const std::string& query, const std::string& encodedJoin);

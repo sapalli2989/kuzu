@@ -255,6 +255,10 @@ void Connection::addScalarFunction(std::string name, function::function_set defi
     database->catalog->addFunction(name, std::move(definitions));
 }
 
+void Connection::addFunction(std::string name, function::function_set functionSet) {
+    database->catalog->addFunction(std::move(name), std::move(functionSet));
+}
+
 void Connection::checkPreparedStatementAccessMode(PreparedStatement* preparedStatement) {
     if (database->systemConfig.readOnly && !preparedStatement->isReadOnly()) {
         throw ConnectionException("Cannot execute write operations in a read-only database!");

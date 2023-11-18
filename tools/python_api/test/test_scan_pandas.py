@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import pytest
 import re
+import time
 
 sys.path.append('../build/')
 import kuzu
@@ -74,3 +75,19 @@ def test_scan_invalid_pandas(get_tmp_path):
                        match=re.escape("Binder exception: Cannot match a built-in function for given function "
                                        "READ_PANDAS(STRING). Supported inputs are\n(POINTER)\n")):
         conn.execute("CALL READ_PANDAS('df213') WHERE id > 20 RETURN id + 5, weight")
+
+
+def test_read_pandas(get_tmp_path):
+    db = kuzu.Database(get_tmp_path)
+    conn = kuzu.Connection(db)
+    data = {
+        'id': np.array([22, 3, 100], dtype=np.int64),
+        'weight': np.array([23.2, 31.7, 42.9], dtype=np.float64)
+    }
+    time.sleep(5)
+    df = pd.DataFrame(data)
+    conn.execute("CREATE NODE TABLE person (id int64, weight double, PRIMARY KEY(id))")
+    conn.execute("COPY person from 'READ_PANDAS(df)'")
+    result = conn.execute("MATCH (p:person) RETURN p.*")
+    assert result.get_next() == [27, 23.2]
+    assert result.get_next() == [105, 42.9]

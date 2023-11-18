@@ -65,8 +65,8 @@ void BuiltInFunctions::registerAggregateFunctions() {
     registerCollect();
 }
 
-Function* BuiltInFunctions::matchScalarFunction(
-    const std::string& name, const std::vector<LogicalType*>& inputTypes) {
+Function* BuiltInFunctions::matchScalarFunction(const std::string& name,
+    const std::vector<LogicalType*>& inputTypes) {
     auto& functionSet = functions.at(name);
     bool isOverload = functionSet.size() > 1;
     std::vector<Function*> candidateFunctions;
@@ -95,8 +95,8 @@ Function* BuiltInFunctions::matchScalarFunction(
     return candidateFunctions[0];
 }
 
-AggregateFunction* BuiltInFunctions::matchAggregateFunction(
-    const std::string& name, const std::vector<common::LogicalType*>& inputTypes, bool isDistinct) {
+AggregateFunction* BuiltInFunctions::matchAggregateFunction(const std::string& name,
+    const std::vector<common::LogicalType*>& inputTypes, bool isDistinct) {
     auto& functionSet = functions.at(name);
     std::vector<AggregateFunction*> candidateFunctions;
     for (auto& function : functionSet) {
@@ -159,8 +159,8 @@ uint32_t BuiltInFunctions::getCastCost(LogicalTypeID inputTypeID, LogicalTypeID 
     }
 }
 
-uint32_t BuiltInFunctions::getAggregateFunctionCost(
-    const std::vector<LogicalType*>& inputTypes, bool isDistinct, AggregateFunction* function) {
+uint32_t BuiltInFunctions::getAggregateFunctionCost(const std::vector<LogicalType*>& inputTypes,
+    bool isDistinct, AggregateFunction* function) {
     if (inputTypes.size() != function->parameterTypeIDs.size() ||
         isDistinct != function->isDistinct) {
         return UINT32_MAX;
@@ -401,8 +401,8 @@ Function* BuiltInFunctions::getBestMatch(std::vector<Function*>& functionsToMatc
     return result;
 }
 
-uint32_t BuiltInFunctions::getFunctionCost(
-    const std::vector<LogicalType*>& inputTypes, Function* function, bool isOverload) {
+uint32_t BuiltInFunctions::getFunctionCost(const std::vector<LogicalType*>& inputTypes,
+    Function* function, bool isOverload) {
     switch (function->type) {
     case FunctionType::SCALAR: {
         auto scalarFunction = reinterpret_cast<ScalarFunction*>(function);
@@ -436,8 +436,8 @@ uint32_t BuiltInFunctions::matchParameters(const std::vector<LogicalType*>& inpu
     return cost;
 }
 
-uint32_t BuiltInFunctions::matchVarLengthParameters(
-    const std::vector<LogicalType*>& inputTypes, LogicalTypeID targetTypeID, bool /*isOverload*/) {
+uint32_t BuiltInFunctions::matchVarLengthParameters(const std::vector<LogicalType*>& inputTypes,
+    LogicalTypeID targetTypeID, bool /*isOverload*/) {
     auto cost = 0u;
     for (auto inputType : inputTypes) {
         auto castCost = getCastCost(inputType->getLogicalTypeID(), targetTypeID);
@@ -712,8 +712,8 @@ void BuiltInFunctions::registerAvg() {
     function_set functionSet;
     for (auto typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         for (auto isDistinct : std::vector<bool>{true, false}) {
-            functionSet.push_back(AggregateFunctionUtil::getAvgFunc(
-                AVG_FUNC_NAME, typeID, LogicalTypeID::DOUBLE, isDistinct));
+            functionSet.push_back(AggregateFunctionUtil::getAvgFunc(AVG_FUNC_NAME, typeID,
+                LogicalTypeID::DOUBLE, isDistinct));
         }
     }
     functions.insert({AVG_FUNC_NAME, std::move(functionSet)});
