@@ -102,10 +102,10 @@ void CopyNode::writeAndResetNodeGroup(node_group_idx_t nodeGroupIdx,
     NodeGroup* nodeGroup) {
     nodeGroup->finalize(nodeGroupIdx);
     auto startOffset = StorageUtils::getStartOffsetOfNodeGroup(nodeGroupIdx);
-    if (pkIndex) {
-        populatePKIndex(pkIndex, nodeGroup->getColumnChunk(pkColumnID), startOffset,
-            nodeGroup->getNumRows() /* startPageIdx */);
-    }
+    // if (pkIndex) {
+    //    populatePKIndex(pkIndex, nodeGroup->getColumnChunk(pkColumnID), startOffset,
+    //        nodeGroup->getNumRows() /* startPageIdx */);
+    // }
     table->append(nodeGroup);
     nodeGroup->resetToEmpty();
 }
