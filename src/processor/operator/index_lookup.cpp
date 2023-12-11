@@ -70,7 +70,8 @@ void IndexLookup::fillOffsetArraysFromVector(transaction::Transaction* transacti
         for (auto i = 0u; i < numKeys; i++) {
             auto key =
                 keyVector->getValue<ku_string_t>(keyVector->state->selVector->selectedPositions[i]);
-            if (!info.pkIndex->lookup(transaction, key.getAsString().c_str(), offsets[i])) {
+            auto keyStr = key.getAsString();
+            if (!info.pkIndex->lookup(transaction, keyStr.c_str(), offsets[i])) {
                 throw RuntimeException(ExceptionMessage::nonExistPKException(key.getAsString()));
             }
         }

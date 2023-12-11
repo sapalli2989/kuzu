@@ -16,27 +16,20 @@ slot_id_t BaseHashIndex::getPrimarySlotIdForKey(
 }
 
 template<typename T>
-HashIndexBuilder<T>::HashIndexBuilder(
-    const std::string& fName, const LogicalType& keyDataType, VirtualFileSystem* vfs)
-    : BaseHashIndex{keyDataType}, numEntries{0} {
-    fileHandle =
-        std::make_unique<FileHandle>(fName, FileHandle::O_PERSISTENT_FILE_CREATE_NOT_EXISTS, vfs);
+HashIndexBuilder<T>::HashIndexBuilder(const std::shared_ptr<FileHandle>& fileHandle,
+    const std::shared_ptr<InMemFile>& overflowFile, uint64_t indexPos,
+    const LogicalType& keyDataType)
+    : BaseHashIndex{keyDataType}, fileHandle(fileHandle),
+      inMemOverflowFile(overflowFile), numEntries{0} {
     indexHeader = std::make_unique<HashIndexHeader>(keyDataType.getLogicalTypeID());
-    fileHandle->addNewPage(); // INDEX_HEADER_ARRAY_HEADER_PAGE
-    fileHandle->addNewPage(); // P_SLOTS_HEADER_PAGE
-    fileHandle->addNewPage(); // O_SLOTS_HEADER_PAGE
-    headerArray = std::make_unique<InMemDiskArrayBuilder<HashIndexHeader>>(
-        *fileHandle, INDEX_HEADER_ARRAY_HEADER_PAGE_IDX, 0 /* numElements */);
+    headerArray = std::make_unique<InMemDiskArrayBuilder<HashIndexHeader>>(*fileHandle,
+        HEADER_PAGES * indexPos + INDEX_HEADER_ARRAY_HEADER_PAGE_IDX, 0 /* numElements */);
     pSlots = std::make_unique<InMemDiskArrayBuilder<Slot<T>>>(
-        *fileHandle, P_SLOTS_HEADER_PAGE_IDX, 0 /* numElements */);
+        *fileHandle, HEADER_PAGES * indexPos + P_SLOTS_HEADER_PAGE_IDX, 0 /* numElements */);
     // Reserve a slot for oSlots, which is always skipped, as we treat slot idx 0 as NULL.
     oSlots = std::make_unique<InMemDiskArrayBuilder<Slot<T>>>(
-        *fileHandle, O_SLOTS_HEADER_PAGE_IDX, 1 /* numElements */);
+        *fileHandle, HEADER_PAGES * indexPos + O_SLOTS_HEADER_PAGE_IDX, 1 /* numElements */);
     allocatePSlots(2);
-    if (keyDataType.getLogicalTypeID() == LogicalTypeID::STRING) {
-        inMemOverflowFile =
-            std::make_unique<InMemFile>(StorageUtils::getOverflowFileName(fName), vfs);
-    }
     keyInsertFunc = InMemHashIndexUtils::initializeInsertFunc(indexHeader->keyDataTypeID);
     keyEqualsFunc = InMemHashIndexUtils::initializeEqualsFunc(indexHeader->keyDataTypeID);
 }
@@ -59,7 +52,7 @@ void HashIndexBuilder<T>::bulkReserve(uint32_t numEntries_) {
 }
 
 template<typename T>
-bool HashIndexBuilder<T>::appendInternal(const uint8_t* key, offset_t value) {
+bool HashIndexBuilder<T>::append(const uint8_t* key, offset_t value) {
     SlotInfo pSlotInfo{getPrimarySlotIdForKey(*indexHeader, key), SlotType::PRIMARY};
     auto currentSlotInfo = pSlotInfo;
     Slot<T>* currentSlot = nullptr;
@@ -82,7 +75,7 @@ bool HashIndexBuilder<T>::appendInternal(const uint8_t* key, offset_t value) {
 }
 
 template<typename T>
-bool HashIndexBuilder<T>::lookupInternalWithoutLock(const uint8_t* key, offset_t& result) {
+bool HashIndexBuilder<T>::lookup(const uint8_t* key, offset_t& result) {
     SlotInfo pSlotInfo{getPrimarySlotIdForKey(*indexHeader, key), SlotType::PRIMARY};
     SlotInfo currentSlotInfo = pSlotInfo;
     Slot<T>* currentSlot;
@@ -126,10 +119,7 @@ template<typename T>
 template<bool IS_LOOKUP>
 bool HashIndexBuilder<T>::lookupOrExistsInSlotWithoutLock(
     Slot<T>* slot, const uint8_t* key, offset_t* result) {
-    for (auto entryPos = 0u; entryPos < slotCapacity; entryPos++) {
-        if (!slot->header.isEntryValid(entryPos)) {
-            continue;
-        }
+    for (auto entryPos = 0u; entryPos < slot->header.numEntries; entryPos++) {
         auto& entry = slot->entries[entryPos];
         if (keyEqualsFunc(key, entry.data, inMemOverflowFile.get())) {
             if constexpr (IS_LOOKUP) {
@@ -179,18 +169,56 @@ template class HashIndexBuilder<ku_string_t>;
 PrimaryKeyIndexBuilder::PrimaryKeyIndexBuilder(
     const std::string& fName, const LogicalType& keyDataType, VirtualFileSystem* vfs)
     : keyDataTypeID{keyDataType.getLogicalTypeID()} {
+    auto fileHandle =
+        std::make_shared<FileHandle>(fName, FileHandle::O_PERSISTENT_FILE_CREATE_NOT_EXISTS, vfs);
+    fileHandle->addNewPages(HEADER_PAGES * NUM_HASH_INDEXES);
+    if (keyDataType.getLogicalTypeID() == LogicalTypeID::STRING) {
+        overflowFile = std::make_shared<InMemFile>(
+            StorageUtils::getOverflowFileName(fileHandle->getFileInfo()->path));
+    }
     switch (keyDataTypeID) {
     case LogicalTypeID::INT64: {
-        hashIndexBuilderForInt64 =
-            std::make_unique<HashIndexBuilder<int64_t>>(fName, keyDataType, vfs);
+        hashIndexBuilderForInt64.reserve(NUM_HASH_INDEXES);
+        for (auto i = 0u; i < NUM_HASH_INDEXES; i++) {
+            hashIndexBuilderForInt64.push_back(std::make_unique<HashIndexBuilder<int64_t>>(
+                fileHandle, overflowFile, i, keyDataType));
+        }
     } break;
     case LogicalTypeID::STRING: {
-        hashIndexBuilderForString =
-            std::make_unique<HashIndexBuilder<ku_string_t>>(fName, keyDataType, vfs);
+        hashIndexBuilderForString.reserve(NUM_HASH_INDEXES);
+        for (auto i = 0u; i < NUM_HASH_INDEXES; i++) {
+            hashIndexBuilderForString.push_back(std::make_unique<HashIndexBuilder<ku_string_t>>(
+                fileHandle, overflowFile, i, keyDataType));
+        }
     } break;
     default: {
         KU_UNREACHABLE;
     }
+    }
+}
+
+void PrimaryKeyIndexBuilder::bulkReserve(uint32_t numEntries) {
+    uint32_t eachSize = numEntries / NUM_HASH_INDEXES + 1;
+    if (keyDataTypeID == common::LogicalTypeID::INT64) {
+        for (auto i = 0u; i < NUM_HASH_INDEXES; i++) {
+            hashIndexBuilderForInt64[i]->bulkReserve(eachSize);
+        }
+    } else {
+        for (auto i = 0u; i < NUM_HASH_INDEXES; i++) {
+            hashIndexBuilderForString[i]->bulkReserve(eachSize);
+        }
+    }
+}
+
+void PrimaryKeyIndexBuilder::flush() {
+    if (keyDataTypeID == common::LogicalTypeID::INT64) {
+        for (auto i = 0u; i < NUM_HASH_INDEXES; i++) {
+            hashIndexBuilderForInt64[i]->flush();
+        }
+    } else {
+        for (auto i = 0u; i < NUM_HASH_INDEXES; i++) {
+            hashIndexBuilderForString[i]->flush();
+        }
     }
 }
 
