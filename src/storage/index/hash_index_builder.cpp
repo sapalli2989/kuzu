@@ -1,5 +1,7 @@
 #include "storage/index/hash_index_builder.h"
 
+#include <iostream>
+
 using namespace kuzu::common;
 
 namespace kuzu {
@@ -169,6 +171,8 @@ void HashIndexBuilder<T>::flush() {
     if (indexHeader->keyDataTypeID == LogicalTypeID::STRING) {
         inMemOverflowFile->flush();
     }
+    std::cout << "P Slots " << pSlots->getNumElements() << std::endl;
+    std::cout << "O Slots " << oSlots->getNumElements() << std::endl;
 }
 
 template class HashIndexBuilder<int64_t>;

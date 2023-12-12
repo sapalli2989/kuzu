@@ -1,20 +1,33 @@
 #include <iostream>
 
-#include "kuzu.hpp"
-using namespace kuzu::main;
+#include <random>
+
+#include "common/timer.h"
+#include "storage/index/hash_index_builder.h"
+
+using namespace kuzu::common;
+using namespace kuzu::storage;
 
 int main() {
-    auto database = std::make_unique<Database>("" /* fill db path */);
-    auto connection = std::make_unique<Connection>(database.get());
+    auto pkIndex = std::make_unique<PrimaryKeyIndexBuilder>("./test.hindex", *LogicalType::INT64());
 
-    // Create schema.
-    connection->query("CREATE NODE TABLE Person(name STRING, age INT64, PRIMARY KEY(name));");
-    // Create nodes.
-    connection->query("CREATE (:Person {name: 'Alice', age: 25});");
-    connection->query("CREATE (:Person {name: 'Bob', age: 30});");
+    int64_t num = 100000000;
+    std::vector<int64_t> keys;
+    keys.reserve(num);
+    std::mt19937_64 rng(0);
+    std::uniform_int_distribution<int64_t> dist(0, num * 10 - 1);
+    for (int64_t i = 0; i < num; i++) {
+        keys.push_back(dist(rng));
+    }
 
-    // Execute a simple query.
-    auto result = connection->query("MATCH (a:Person) RETURN a.name AS NAME, a.age AS AGE;");
-    // Print query result.
-    std::cout << result->toString();
+    pkIndex->bulkReserve(num);
+    Timer timer;
+    timer.start();
+    for (int64_t i = 0; i < num; i++) {
+        pkIndex->append(keys[i], i);
+    }
+    auto timeSpent = timer.getElapsedTimeInMS();
+    std::cout << "Time spent: " << timeSpent << " ms" << std::endl;
+
+    pkIndex->flush();
 }
