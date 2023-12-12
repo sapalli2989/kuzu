@@ -5,54 +5,47 @@
 #include "common/timer.h"
 #include "robinhood.h"
 #include "storage/index/hash_index_builder.h"
+#include <latch>
 
 using namespace kuzu::common;
 using namespace kuzu::storage;
 
 struct Func {
-    static void buildRobinHood(const std::vector<int64_t>& keys,
-        robin_hood::unordered_map<int64_t, int64_t>* map, int64_t start, int64_t numValues) {
-        Timer timer;
-        timer.start();
+    static void buildRobinHood(std::latch* latch, const std::vector<int64_t>& keys,
+        robin_hood::unordered_map<int64_t, int64_t> map, int64_t start, int64_t numValues) {
+        latch->arrive_and_wait();
+
         for (int64_t i = 0; i < numValues; i++) {
-            map->insert({keys[i + start], i});
+            map.insert({keys[i + start], i});
         }
-        auto timeSpent = timer.getElapsedTimeInMS();
-        std::cout << "Time spent: " << timeSpent << " ms"
-                  << ", num values: " << numValues << std::endl;
     }
 
-    static void buildHashIndex(const std::vector<int64_t>& keys,
-        PrimaryKeyIndexBuilder* indexBuilder, int64_t start, int64_t numValues) {
-        Timer timer;
-        timer.start();
+    static void buildHashIndex(std::latch* latch, const std::vector<int64_t>& keys,
+        std::unique_ptr<PrimaryKeyIndexBuilder> indexBuilder, int64_t start, int64_t numValues) {
+        latch->arrive_and_wait();
+
         for (int64_t i = 0; i < numValues; i++) {
             indexBuilder->append(keys[i + start], i);
         }
-        auto timeSpent = timer.getElapsedTimeInMS();
-        std::cout << "Time spent: " << timeSpent << " ms"
-                  << ", num values: " << numValues << std::endl;
     }
 };
 
 void testRobinHood(const std::vector<int64_t>& keys, int64_t num, int64_t numParts) {
-    std::vector<std::unique_ptr<robin_hood::unordered_map<int64_t, int64_t>>> robinHoods;
-    robinHoods.reserve(numParts);
-    for (auto i = 0u; i < numParts; i++) {
-        robinHoods.push_back(std::make_unique<robin_hood::unordered_map<int64_t, int64_t>>());
-    }
-
     std::vector<std::unique_ptr<std::thread>> threads;
     threads.reserve(numParts);
 
-    Timer timer;
-    timer.start();
+    std::latch latch(numParts);
+
     for (auto i = 0u; i < numParts; i++) {
         auto length = num / numParts;
         auto start = i * length;
+        auto mp = robin_hood::unordered_map<int64_t, int64_t>();
+        mp.reserve(length);
         threads.push_back(std::make_unique<std::thread>(
-            Func::buildRobinHood, keys, robinHoods[i].get(), start, length));
+            Func::buildRobinHood, &latch, keys, std::move(mp), start, length));
     }
+    Timer timer;
+    timer.start();
     for (auto& thread : threads) {
         thread->join();
     }
@@ -61,25 +54,22 @@ void testRobinHood(const std::vector<int64_t>& keys, int64_t num, int64_t numPar
 }
 
 void testHashIndex(const std::vector<int64_t>& keys, int64_t num, int64_t numParts) {
-    std::vector<std::unique_ptr<PrimaryKeyIndexBuilder>> hashIndexes;
-    hashIndexes.reserve(numParts);
-    for (auto i = 0u; i < numParts; i++) {
-        hashIndexes.push_back(std::make_unique<PrimaryKeyIndexBuilder>(
-            "./test" + std::to_string(i) + ".hindex", *LogicalType::INT64()));
-    }
-
     std::vector<std::unique_ptr<std::thread>> threads;
     threads.reserve(numParts);
 
-    Timer timer;
-    timer.start();
+    std::latch latch(numParts);
+
     for (auto i = 0u; i < numParts; i++) {
         auto length = num / numParts;
         auto start = i * length;
-        hashIndexes[i]->bulkReserve(length);
+        auto hindex = std::make_unique<PrimaryKeyIndexBuilder>(
+            "./test" + std::to_string(i) + ".hindex", *LogicalType::INT64());
+        hindex->bulkReserve(length);
         threads.push_back(std::make_unique<std::thread>(
-            Func::buildHashIndex, keys, hashIndexes[i].get(), start, length));
+            Func::buildHashIndex, &latch, keys, std::move(hindex), start, length));
     }
+    Timer timer;
+    timer.start();
     for (auto& thread : threads) {
         thread->join();
     }
@@ -87,9 +77,9 @@ void testHashIndex(const std::vector<int64_t>& keys, int64_t num, int64_t numPar
     std::cout << "End to end time spent: " << timeSpent << " ms" << std::endl;
 }
 
-int main() {
-    int64_t numParts = 6;
-    int64_t num = 100000000;
+int main(int /*argc*/, char** argv) {
+    int64_t numParts = atoi(argv[1]);
+    int64_t num = 100'000'000;
     std::vector<int64_t> keys;
     keys.reserve(num);
     std::mt19937_64 rng(0);
@@ -98,6 +88,6 @@ int main() {
         keys.push_back(dist(rng));
     }
 
-    testRobinHood(keys, num, numParts);
+    // testRobinHood(keys, num, numParts);
     testHashIndex(keys, num, numParts);
 }
