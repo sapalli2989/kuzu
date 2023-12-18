@@ -15,17 +15,17 @@ public:
         const std::string& query, main::Connection& conn);
 
 private:
-    static bool testStatement(
+    static void testStatement(
         TestStatement* statement, main::Connection& conn, std::string& databasePath);
-    static bool checkLogicalPlans(std::unique_ptr<main::PreparedStatement>& preparedStatement,
+    static void checkLogicalPlans(std::unique_ptr<main::PreparedStatement>& preparedStatement,
         TestStatement* statement, main::Connection& conn);
-    static bool checkLogicalPlan(std::unique_ptr<main::PreparedStatement>& preparedStatement,
+    static void checkLogicalPlan(std::unique_ptr<main::PreparedStatement>& preparedStatement,
         TestStatement* statement, main::Connection& conn, uint32_t planIdx);
     static std::vector<std::string> convertResultToString(
         main::QueryResult& queryResult, bool checkOutputOrder = false);
     static std::string convertResultToMD5Hash(
         main::QueryResult& queryResult); // returns hash and number of values hashed
-    static bool checkPlanResult(std::unique_ptr<main::QueryResult>& result,
+    static void checkPlanResult(std::unique_ptr<main::QueryResult>& result,
         TestStatement* statement, const std::string& planStr, uint32_t planIndex);
 };
 
