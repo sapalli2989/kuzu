@@ -203,11 +203,11 @@ define run-cmake-debug
 endef
 
 define build-cmake-release
-	$(call build-cmake,release,Release,$1)
+	$(call build-cmake,release1,Release,$1)
 endef
 
 define config-cmake-release
-	$(call config-cmake,release,Release,$1)
+	$(call config-cmake,release1,Release,$1)
 endef
 
 define run-cmake-release

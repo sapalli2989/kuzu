@@ -1,3 +1,5 @@
+#include <uv.h>
+
 #include "binder/expression/variable_expression.h"
 #include "catalog/node_table_schema.h"
 #include "planner/operator/logical_partitioner.h"

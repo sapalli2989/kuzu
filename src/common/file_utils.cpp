@@ -1,6 +1,7 @@
 #include "common/file_utils.h"
 
 #include <cstring>
+#include <uv.h>
 
 #include "common/assert.h"
 #include "common/exception/storage.h"
@@ -9,6 +10,9 @@
 #include "glob/glob.hpp"
 
 #ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <fileapi.h>
 #include <windows.h>
 #endif

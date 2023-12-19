@@ -1,6 +1,7 @@
 #include <thread>
 
 #ifdef _WIN32
+#define _WINSOCKAPI_
 #include <windows.h>
 #endif
 

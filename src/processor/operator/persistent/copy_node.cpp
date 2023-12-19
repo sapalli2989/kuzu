@@ -1,6 +1,7 @@
 #include "processor/operator/persistent/copy_node.h"
 
 #include <optional>
+#include <uv.h>
 
 #include "common/exception/copy.h"
 #include "common/exception/message.h"
@@ -97,7 +98,11 @@ void CopyNode::initLocalStateInternal(ResultSet* resultSet, ExecutionContext* /*
         nodeGroupInfo.push_back(std::make_unique<NodeGroupInfo>(i));
     }
     columnState = state.get();
-    uv_loop_init(&loop);
+    uv_loop_t* loop = uv_default_loop();
+    uv_loop_t* loop1;
+    int ret = uv_loop_init(loop1);
+    throw Exception("here local1");
+    throw Exception("here local");
 }
 
 bool CopyNode::waitForOneNodeGroup(uint8_t& curGroup) {
@@ -125,6 +130,7 @@ bool CopyNode::waitForAllNodeGroup() {
 }
 
 void CopyNode::executeInternal(ExecutionContext* context) {
+    throw Exception("start execute");
     while (children[0]->getNextTuple(context)) {
         auto originalSelVector = columnState->selVector;
         copyToNodeGroup();
@@ -159,7 +165,8 @@ void CopyNode::writeNodeGroup(node_group_idx_t nodeGroupIdx,
     //    populatePKIndex(pkIndex, nodeGroup->getColumnChunk(pkColumnID), startOffset,
     //        nodeGroup->getNumRows() /* startPageIdx */);
     // }
-    table->appendAsync(nodeGroup, &loop, nodeGroupInfo[currentNodeGroup].get());
+    throw Exception("here");
+    table->appendAsync(nodeGroup, loop.get(), nodeGroupInfo[currentNodeGroup].get());
 
     while(waitForOneNodeGroup(currentNodeGroup)) {};
 }
@@ -274,6 +281,7 @@ void CopyNode::copyToNodeGroup() {
         numAppendedTuples += numAppendedTuplesInNodeGroup;
         if (localNodeGroups[currentNodeGroup]->isFull()) {
             node_group_idx_t nodeGroupIdx;
+            throw Exception("??");
             nodeGroupIdx = sharedState->getNextNodeGroupIdx();
             writeNodeGroup(nodeGroupIdx, sharedState->pkIndex.get(),
                 sharedState->pkColumnIdx, sharedState->table,

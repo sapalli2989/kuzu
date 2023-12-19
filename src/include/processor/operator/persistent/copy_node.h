@@ -1,7 +1,6 @@
 #pragma once
 
 #include <utility>
-#include <uv.h>
 
 #include "processor/operator/aggregate/hash_aggregate.h"
 #include "processor/operator/call/in_query_call.h"
@@ -135,7 +134,7 @@ protected:
     std::vector<common::ValueVector*> columnVectors;
     std::vector<std::unique_ptr<storage::NodeGroup>> localNodeGroups;
     uint8_t k = 2;
-    uv_loop_t loop;
+    std::unique_ptr<uv_loop_t> loop;
     uint8_t currentNodeGroup = 0;
     std::vector<std::unique_ptr<common::NodeGroupInfo>> nodeGroupInfo;
 };
