@@ -1,7 +1,6 @@
 #pragma once
 
 #include <fcntl.h>
-#include <uv.h>
 #include <sys/stat.h>
 #if defined(_WIN32)
 #include <io.h>
@@ -12,6 +11,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <uv.h>
 
 namespace kuzu {
 namespace common {

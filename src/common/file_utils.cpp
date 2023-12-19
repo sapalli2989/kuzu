@@ -1,6 +1,5 @@
 #include "common/file_utils.h"
 
-#include <uv.h>
 #include <cstring>
 
 #include "common/assert.h"
@@ -205,9 +204,17 @@ void FileUtils::writeToFileAsync(
         uv_fs_t writeReq;
         writeReq.data = info;
         uv_buf_t iov = uv_buf_init((char *)(buffer + bufferOffset), numBytesToWrite);
-        uv_fs_write(loop, &writeReq, fileInfo->fd, &iov, 1, offset, onWrite);
+#if defined(_WIN32)
+        uv_fs_write(NULL, &writeReq, uv_open_osfhandle((HANDLE)(fileInfo->handle)), &iov, 1, offset,
+            NULL);
+#else
+        uv_fs_write(NULL, &writeReq, fileInfo->fd, &iov, 1, offset, NULL);
+#endif
         info->totalReq++;
         info->byteSize += numBytesToWrite;
+        info->receivedReq++;
+        info->receivedSize += writeReq.result;
+        uv_fs_req_cleanup(&writeReq);
         remainingNumBytesToWrite -= numBytesToWrite;
         offset += numBytesToWrite;
         bufferOffset += numBytesToWrite;
