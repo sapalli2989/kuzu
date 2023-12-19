@@ -444,7 +444,7 @@ PrimaryKeyIndex::PrimaryKeyIndex(const DBFileIDAndName& dbFileIDAndName, bool re
 
     if (keyDataType.getLogicalTypeID() == LogicalTypeID::STRING) {
         overflowFile =
-            std::make_shared<DiskOverflowFile>(dbFileIDAndName, &bufferManager, wal, readOnly);
+            std::make_shared<DiskOverflowFile>(dbFileIDAndName, &bufferManager, wal, readOnly, vfs);
     }
 
     if (keyDataTypeID == LogicalTypeID::STRING) {

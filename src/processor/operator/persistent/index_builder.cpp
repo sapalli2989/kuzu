@@ -11,7 +11,7 @@ using namespace kuzu::storage;
 
 IndexBuilderGlobalQueues::IndexBuilderGlobalQueues(std::unique_ptr<PrimaryKeyIndexBuilder> pkIndex)
     : pkIndex(std::move(pkIndex)) {
-    if (pkIndex->keyTypeID() == LogicalTypeID::STRING) {
+    if (this->pkIndex->keyTypeID() == LogicalTypeID::STRING) {
         queues.emplace<StringQueues>();
     } else {
         queues.emplace<IntQueues>();
@@ -66,25 +66,56 @@ void IndexBuilderConsumer::init(size_t seq, uint64_t numThreads) {
     }
 }
 
-void IndexBuilderConsumer::consume() {
-    globalQueues->consume(queueRange);
-}
-
 IndexBuilderLocalBuffers::IndexBuilderLocalBuffers(IndexBuilderGlobalQueues& globalQueues)
     : globalQueues(&globalQueues) {
     if (globalQueues.pkTypeID() == LogicalTypeID::STRING) {
-        buffers.emplace<StringBuffers>();
+        stringBuffers = std::make_unique<StringBuffers>();
     } else {
-        buffers.emplace<IntBuffers>();
+        intBuffers = std::make_unique<IntBuffers>();
+    }
+}
+
+void IndexBuilderLocalBuffers::insert(std::string key, common::offset_t value) {
+    auto indexPos = getHashIndexPosition(key.c_str());
+    if ((*stringBuffers)[indexPos].full()) {
+        globalQueues->insert(indexPos, std::move((*stringBuffers)[indexPos]));
+    }
+    (*stringBuffers)[indexPos].push_back(std::make_pair(key, value));
+}
+
+void IndexBuilderLocalBuffers::insert(int64_t key, common::offset_t value) {
+    auto indexPos = getHashIndexPosition(key);
+    if ((*intBuffers)[indexPos].full()) {
+        globalQueues->insert(indexPos, std::move((*intBuffers)[indexPos]));
+    }
+    (*intBuffers)[indexPos].push_back(std::make_pair(key, value));
+}
+
+void IndexBuilderLocalBuffers::flush() {
+    if (globalQueues->pkTypeID() == LogicalTypeID::STRING) {
+        for (auto i = 0u; i < stringBuffers->size(); i++) {
+            globalQueues->insert(i, std::move((*stringBuffers)[i]));
+        }
+    } else {
+        for (auto i = 0u; i < intBuffers->size(); i++) {
+            globalQueues->insert(i, std::move((*intBuffers)[i]));
+        }
     }
 }
 
 IndexBuilderSharedState::IndexBuilderSharedState(std::unique_ptr<PrimaryKeyIndexBuilder> pkIndex)
     : globalQueues(std::move(pkIndex)) {}
 
-IndexBuilder::IndexBuilder(std::shared_ptr<IndexBuilderSharedState> sharedState, PassKey /*key*/)
-    : sharedState(std::move(sharedState)), consumer(sharedState->globalQueues),
-      localBuffers(sharedState->globalQueues) {}
+IndexBuilder::IndexBuilder(std::shared_ptr<IndexBuilderSharedState> sharedState)
+    : sharedState(std::move(sharedState)), consumer(this->sharedState->globalQueues),
+      localBuffers(this->sharedState->globalQueues) {}
+
+void IndexBuilderSharedState::init(uint64_t numThreads) {
+    latch.emplace(numThreads);
+}
+
+IndexBuilder::IndexBuilder(std::unique_ptr<PrimaryKeyIndexBuilder> pkIndex)
+    : IndexBuilder(std::make_shared<IndexBuilderSharedState>(std::move(pkIndex))) {}
 
 void IndexBuilder::initLocalStateInternal(ExecutionContext* context) {
     consumer.init(sharedState->nextSeq(), context->numThreads);
@@ -110,6 +141,10 @@ void IndexBuilder::insert(ColumnChunk* chunk, offset_t nodeOffset, offset_t numN
         throw CopyException(ExceptionMessage::invalidPKType(chunk->getDataType()->toString()));
     }
     }
+}
+
+void IndexBuilder::producingFinished() {
+    sharedState->latch->arrive_and_wait();
 }
 
 void IndexBuilder::checkNonNullConstraint(NullColumnChunk* nullChunk, offset_t numNodes) {

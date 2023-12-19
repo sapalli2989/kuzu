@@ -174,7 +174,7 @@ PrimaryKeyIndexBuilder::PrimaryKeyIndexBuilder(
     fileHandle->addNewPages(HEADER_PAGES * NUM_HASH_INDEXES);
     if (keyDataType.getLogicalTypeID() == LogicalTypeID::STRING) {
         overflowFile = std::make_shared<InMemFile>(
-            StorageUtils::getOverflowFileName(fileHandle->getFileInfo()->path));
+            StorageUtils::getOverflowFileName(fileHandle->getFileInfo()->path), vfs);
     }
     switch (keyDataTypeID) {
     case LogicalTypeID::INT64: {

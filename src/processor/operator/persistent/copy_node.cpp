@@ -20,7 +20,7 @@ void CopyNodeSharedState::init(uint64_t numThreads) {
 }
 
 void CopyNodeSharedState::appendIncompleteNodeGroup(
-    std::unique_ptr<NodeGroup> localNodeGroup, IndexBuilder* indexBuilder) {
+    std::unique_ptr<NodeGroup> localNodeGroup, std::optional<IndexBuilder>& indexBuilder) {
     std::unique_lock xLck{mtx};
     if (!sharedNodeGroup) {
         sharedNodeGroup = std::move(localNodeGroup);
@@ -38,7 +38,7 @@ void CopyNodeSharedState::appendIncompleteNodeGroup(
     }
 }
 
-void CopyNodeSharedState::addLastNodeGroup(IndexBuilder* indexBuilder) {
+void CopyNodeSharedState::addLastNodeGroup(std::optional<IndexBuilder>& indexBuilder) {
     if (sharedNodeGroup) {
         auto nodeGroupIdx = getNextNodeGroupIdxWithoutLock();
         CopyNode::writeAndResetNodeGroup(
@@ -74,7 +74,7 @@ void CopyNode::initGlobalIndexBuilder(ExecutionContext* context) {
             sharedState->readerSharedState->sharedState.get());
         pkIndex->bulkReserve(readerSharedState->numRows);
 
-        indexBuilder = std::make_unique<IndexBuilder>(std::move(pkIndex));
+        indexBuilder = std::make_optional<IndexBuilder>(std::move(pkIndex));
         indexBuilder->initGlobalStateInternal(context);
     }
 }
@@ -118,20 +118,21 @@ void CopyNode::executeInternal(ExecutionContext* context) {
         columnState->selVector = std::move(originalSelVector);
     }
     if (localNodeGroup->getNumRows() > 0) {
-        sharedState->appendIncompleteNodeGroup(std::move(localNodeGroup), indexBuilder.get());
+        sharedState->appendIncompleteNodeGroup(std::move(localNodeGroup), indexBuilder);
     }
 
     // Sync point.
     if (sharedState->workers.fetch_sub(1, std::memory_order_relaxed) == 0) {
-        sharedState->addLastNodeGroup(indexBuilder.get());
+        sharedState->addLastNodeGroup(indexBuilder);
     }
     if (indexBuilder) {
         indexBuilder->producingFinished();
     }
 }
 
-void CopyNode::writeAndResetNodeGroup(node_group_idx_t nodeGroupIdx, IndexBuilder* indexBuilder,
-    column_id_t pkColumnID, NodeTable* table, NodeGroup* nodeGroup) {
+void CopyNode::writeAndResetNodeGroup(node_group_idx_t nodeGroupIdx,
+    std::optional<IndexBuilder>& indexBuilder, column_id_t pkColumnID, NodeTable* table,
+    NodeGroup* nodeGroup) {
 
     nodeGroup->finalize(nodeGroupIdx);
     if (indexBuilder) {
@@ -174,7 +175,7 @@ void CopyNode::copyToNodeGroup() {
             node_group_idx_t nodeGroupIdx;
             nodeGroupIdx = sharedState->getNextNodeGroupIdx();
 
-            writeAndResetNodeGroup(nodeGroupIdx, indexBuilder.get(), sharedState->pkColumnIdx,
+            writeAndResetNodeGroup(nodeGroupIdx, indexBuilder, sharedState->pkColumnIdx,
                 sharedState->table, localNodeGroup.get());
         }
         if (numAppendedTuples < numTuplesToAppend) {

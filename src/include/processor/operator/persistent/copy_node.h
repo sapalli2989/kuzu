@@ -31,10 +31,10 @@ public:
 
     inline uint64_t getCurNodeGroupIdx() const { return currentNodeGroupIdx; }
 
-    void appendIncompleteNodeGroup(
-        std::unique_ptr<storage::NodeGroup> localNodeGroup, IndexBuilder* indexBuilder);
+    void appendIncompleteNodeGroup(std::unique_ptr<storage::NodeGroup> localNodeGroup,
+        std::optional<IndexBuilder>& indexBuilder);
 
-    void addLastNodeGroup(IndexBuilder* indexBuilder);
+    void addLastNodeGroup(std::optional<IndexBuilder>& indexBuilder);
 
 private:
     inline common::offset_t getNextNodeGroupIdxWithoutLock() { return currentNodeGroupIdx++; }
@@ -89,7 +89,7 @@ public:
     CopyNode(std::shared_ptr<CopyNodeSharedState> sharedState, std::unique_ptr<CopyNodeInfo> info,
         std::unique_ptr<ResultSetDescriptor> resultSetDescriptor,
         std::unique_ptr<PhysicalOperator> child, uint32_t id, const std::string& paramsString,
-        std::unique_ptr<IndexBuilder> indexBuilder = nullptr)
+        std::optional<IndexBuilder> indexBuilder = std::nullopt)
         : Sink{std::move(resultSetDescriptor), PhysicalOperatorType::COPY_NODE, std::move(child),
               id, paramsString},
           sharedState{std::move(sharedState)}, info{std::move(info)},
@@ -107,12 +107,13 @@ public:
 
     inline std::unique_ptr<PhysicalOperator> clone() final {
         return std::make_unique<CopyNode>(sharedState, info->copy(), resultSetDescriptor->copy(),
-            children[0]->clone(), id, paramsString, indexBuilder ? indexBuilder->clone() : nullptr);
+            children[0]->clone(), id, paramsString,
+            indexBuilder ? std::make_optional<IndexBuilder>(indexBuilder->clone()) : std::nullopt);
     }
 
     static void writeAndResetNodeGroup(common::node_group_idx_t nodeGroupIdx,
-        IndexBuilder* indexBuilder, common::column_id_t pkColumnID, storage::NodeTable* table,
-        storage::NodeGroup* nodeGroup);
+        std::optional<IndexBuilder>& indexBuilder, common::column_id_t pkColumnID,
+        storage::NodeTable* table, storage::NodeGroup* nodeGroup);
 
 private:
     void copyToNodeGroup();
@@ -123,7 +124,7 @@ protected:
     std::shared_ptr<CopyNodeSharedState> sharedState;
     std::unique_ptr<CopyNodeInfo> info;
 
-    std::unique_ptr<IndexBuilder> indexBuilder;
+    std::optional<IndexBuilder> indexBuilder;
 
     common::DataChunkState* columnState;
     std::vector<std::shared_ptr<common::ValueVector>> nullColumnVectors;

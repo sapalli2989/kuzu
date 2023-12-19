@@ -1,5 +1,6 @@
 #include <variant>
 
+#include "common/copy_constructors.h"
 #include "common/static_vector.h"
 #include "common/types/internal_id_t.h"
 #include "common/types/types.h"
@@ -47,7 +48,7 @@ public:
     explicit IndexBuilderConsumer(IndexBuilderGlobalQueues& globalQueues);
 
     void init(size_t seq, uint64_t numThreads);
-    void consume();
+    void consume() { globalQueues->consume(queueRange); }
 
 private:
     IndexBuilderGlobalQueues* globalQueues;
@@ -66,9 +67,11 @@ public:
 private:
     IndexBuilderGlobalQueues* globalQueues;
 
+    // These arrays are much too large to be inline.
     using StringBuffers = std::array<StringBuffer, storage::NUM_HASH_INDEXES>;
     using IntBuffers = std::array<IntBuffer, storage::NUM_HASH_INDEXES>;
-    std::variant<StringBuffers, IntBuffers> buffers;
+    std::unique_ptr<StringBuffers> stringBuffers;
+    std::unique_ptr<IntBuffers> intBuffers;
 };
 
 class IndexBuilderSharedState {
@@ -86,22 +89,17 @@ private:
 
     // Atomic for distributing ranges to each operator.
     std::atomic<size_t> seq;
-    std::unique_ptr<std::latch> latch;
+    std::optional<std::latch> latch;
 };
 
 class IndexBuilder {
-    // PassKey: only we can create instances of this class.
-    // This means only we can call the below constructor, but we can let make_unique
-    // call it (unlike if it were private).
-    struct PassKey {};
+    explicit IndexBuilder(std::shared_ptr<IndexBuilderSharedState> sharedState);
 
 public:
-    explicit IndexBuilder(std::shared_ptr<IndexBuilderSharedState> sharedState, PassKey key);
+    NO_COPY(IndexBuilder);
     explicit IndexBuilder(std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex);
 
-    std::unique_ptr<IndexBuilder> clone() {
-        return std::make_unique<IndexBuilder>(sharedState, PassKey());
-    }
+    IndexBuilder clone() { return IndexBuilder(sharedState); }
 
     void initGlobalStateInternal(ExecutionContext* /*context*/) {}
     void initLocalStateInternal(ExecutionContext* context);

@@ -1,5 +1,7 @@
 #include "common/file_system/local_file_system.h"
 
+#include <cstring>
+
 #if defined(_WIN32)
 #include <fileapi.h>
 #include <io.h>
