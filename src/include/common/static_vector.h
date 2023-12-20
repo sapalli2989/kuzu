@@ -1,4 +1,5 @@
 #include <cstring>
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -12,8 +13,10 @@ class MaybeUninit {
     std::aligned_storage_t<sizeof(T), alignof(T)> data;
 
 public:
-    T& assumeInit() { return *reinterpret_cast<T*>(&data); }
-    const T& assumeInit() const { return *reinterpret_cast<const T*>(&data); }
+    T& assumeInit() { return *ptr(); }
+    const T& assumeInit() const { return *ptr(); }
+    T* ptr() { return reinterpret_cast<T*>(&data); }
+    const T* ptr() const { return reinterpret_cast<const T*>(&data); }
 };
 
 template<typename T, size_t N>
@@ -21,49 +24,54 @@ class StaticVector {
     MaybeUninit<T> items[N];
     size_t len;
 
+    StaticVector(const StaticVector& other) : len(other.len) {
+        std::uninitialized_copy(other.begin(), other.end(), begin());
+    }
+
 public:
     StaticVector() : len(0){};
-    StaticVector(const StaticVector& other) : len(other.len) {
-        // Element-wise copy.
-        for (auto i = 0u; i < len; i++) {
-            new (&this->operator[](i)) T(other[i]);
-        }
-    }
     StaticVector(StaticVector&& other) : len(other.len) {
-        // SAFETY: since we set other.len to 0, none of the other elements will be destroyed.
-        std::memcpy(items, other.items, len * sizeof(T));
+        std::uninitialized_move(other.begin(), other.end(), begin());
         other.len = 0;
     }
-    StaticVector& operator=(const StaticVector& other) {
-        StaticVector clone(other);
-        return *this = std::move(other);
-    }
+    StaticVector copy() const { return *this; }
+    StaticVector& operator=(const StaticVector& other) = delete;
     StaticVector& operator=(StaticVector&& other) {
         if (&other != this) {
             clear();
-            std::memcpy(items, other.items, len * sizeof(T));
+            len = other.len;
+            std::uninitialized_move(other.begin(), other.end(), begin());
             other.len = 0;
         }
         return *this;
     }
     ~StaticVector() { clear(); }
 
-    T& operator[](size_t i) { return items[i].assumeInit(); }
-    const T& operator[](size_t i) const { return items[i].assumeInit(); }
+    T& operator[](size_t i) {
+        KU_ASSERT(i < len);
+        return items[i].assumeInit();
+    }
+    const T& operator[](size_t i) const {
+        KU_ASSERT(i < len);
+        return items[i].assumeInit();
+    }
     void push_back(T elem) {
         KU_ASSERT(len < N);
-        new (&this->operator[](len)) T(std::move(elem));
+        new (items[len].ptr()) T(std::move(elem));
         len++;
     }
     T pop_back() {
         KU_ASSERT(len > 0);
         len--;
-        return std::move(this->operator[](len));
+        return std::move(items[len].assumeInit());
     }
+    T* begin() { return items[0].ptr(); }
+    const T* begin() const { return items[0].ptr(); }
+    T* end() { return items[len].ptr(); }
+    const T* end() const { return items[len].ptr(); }
+
     void clear() {
-        for (auto i = 0u; i < len; i++) {
-            this->operator[](i).~T();
-        }
+        std::destroy(begin(), end());
         len = 0;
     }
 

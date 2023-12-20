@@ -22,10 +22,10 @@ public:
         : readerSharedState{nullptr}, distinctSharedState{nullptr}, currentNodeGroupIdx{0},
           sharedNodeGroup{nullptr} {};
 
-    void init(uint64_t numThreads);
+    void init();
 
     inline common::offset_t getNextNodeGroupIdx() {
-        std::unique_lock<std::mutex> lck{mtx};
+        std::unique_lock lck{mtx};
         return getNextNodeGroupIdxWithoutLock();
     }
 
@@ -47,7 +47,6 @@ private:
     // Primary key info
     common::vector_idx_t pkColumnIdx;
     std::unique_ptr<common::LogicalType> pkType;
-    std::atomic<size_t> workers;
 
     InQueryCallSharedState* readerSharedState;
     HashAggregateSharedState* distinctSharedState;

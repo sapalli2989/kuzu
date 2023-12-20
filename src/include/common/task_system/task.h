@@ -47,9 +47,7 @@ public:
         return isCompletedNoLock() && !hasExceptionNoLock();
     }
 
-    inline bool isCompletedNoLock() const {
-        return (numThreadsRegistered > 0 && numThreadsFinished == numThreadsRegistered);
-    }
+    inline bool isCompletedNoLock() const { return numThreadsFinished == maxNumThreads; }
 
     inline void setSingleThreadedTask() { maxNumThreads = 1; }
 
@@ -73,9 +71,7 @@ public:
     }
 
 private:
-    bool canRegisterNoLock() const {
-        return 0 == numThreadsFinished && maxNumThreads > numThreadsRegistered;
-    }
+    bool canRegisterNoLock() const { return numThreadsRegistered < maxNumThreads; }
 
     inline bool hasExceptionNoLock() const { return exceptionsPtr != nullptr; }
 

@@ -8,7 +8,6 @@
 #include "processor/operator/persistent/mpsc_queue.h"
 #include "storage/index/hash_index_builder.h"
 #include "storage/store/column_chunk.h"
-#include <latch>
 
 namespace kuzu {
 namespace processor {
@@ -21,7 +20,7 @@ class IndexBuilderGlobalQueues {
 public:
     explicit IndexBuilderGlobalQueues(std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex);
 
-    void consume(std::pair<size_t, size_t> queueRange);
+    void consume(size_t id);
     void flushToDisk() const;
 
     void insert(size_t index, StringBuffer elem) {
@@ -33,8 +32,18 @@ public:
 
     common::LogicalTypeID pkTypeID() const { return pkIndex->keyTypeID(); }
 
+    size_t addWorker();
+    void workerQuit(size_t id);
+
 private:
+    void updateRangesNoLock();
+
+    std::shared_mutex mtx;
+    std::vector<std::pair<size_t, size_t>> consumeRanges;
+    std::vector<size_t> activeWorkers;
+
     std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex;
+    size_t nextID;
 
     using StringQueues = std::array<MPSCQueue<StringBuffer>, storage::NUM_HASH_INDEXES>;
     using IntQueues = std::array<MPSCQueue<IntBuffer>, storage::NUM_HASH_INDEXES>;
@@ -47,12 +56,13 @@ class IndexBuilderConsumer {
 public:
     explicit IndexBuilderConsumer(IndexBuilderGlobalQueues& globalQueues);
 
-    void init(size_t seq, uint64_t numThreads);
-    void consume() { globalQueues->consume(queueRange); }
+    void init();
+    void consume() { globalQueues->consume(id); }
+    void quit() { globalQueues->workerQuit(id); }
 
 private:
     IndexBuilderGlobalQueues* globalQueues;
-    std::pair<size_t, size_t> queueRange;
+    uint64_t id;
 };
 
 class IndexBuilderLocalBuffers {
@@ -79,17 +89,11 @@ class IndexBuilderSharedState {
 
 public:
     explicit IndexBuilderSharedState(std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex);
-    void init(uint64_t numThreads);
+    void init();
     void flush() { globalQueues.flushToDisk(); }
 
 private:
-    size_t nextSeq() { return seq.fetch_add(1, std::memory_order_relaxed); }
-
     IndexBuilderGlobalQueues globalQueues;
-
-    // Atomic for distributing ranges to each operator.
-    std::atomic<size_t> seq;
-    std::optional<std::latch> latch;
 };
 
 class IndexBuilder {
@@ -101,13 +105,13 @@ public:
 
     IndexBuilder clone() { return IndexBuilder(sharedState); }
 
-    void initGlobalStateInternal(ExecutionContext* /*context*/) {}
+    void initGlobalStateInternal(ExecutionContext* /*context*/) { sharedState->init(); }
     void initLocalStateInternal(ExecutionContext* context);
     void consume() { consumer.consume(); }
     void insert(
         storage::ColumnChunk* chunk, common::offset_t nodeOffset, common::offset_t numNodes);
-    void flushLocalBuffers() { localBuffers.flush(); }
-    void producingFinished();
+    void finishedProducing();
+    void finalize(ExecutionContext* context);
 
 private:
     void checkNonNullConstraint(storage::NullColumnChunk* nullChunk, common::offset_t numNodes);
