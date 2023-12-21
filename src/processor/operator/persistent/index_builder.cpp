@@ -1,5 +1,7 @@
 #include "processor/operator/persistent/index_builder.h"
 
+#include <thread>
+
 #include "common/cast.h"
 #include "common/exception/copy.h"
 #include "common/exception/message.h"
@@ -12,7 +14,7 @@ using namespace kuzu::common;
 using namespace kuzu::storage;
 
 IndexBuilderGlobalQueues::IndexBuilderGlobalQueues(std::unique_ptr<PrimaryKeyIndexBuilder> pkIndex)
-    : pkIndex(std::move(pkIndex)), nextID(0) {
+    : nextID(0), pkIndex(std::move(pkIndex)) {
     if (this->pkIndex->keyTypeID() == LogicalTypeID::STRING) {
         queues.emplace<StringQueues>();
     } else {
@@ -21,12 +23,26 @@ IndexBuilderGlobalQueues::IndexBuilderGlobalQueues(std::unique_ptr<PrimaryKeyInd
 }
 
 void IndexBuilderGlobalQueues::consume(size_t id) {
-    std::shared_lock slck{mtx};
+    std::shared_lock slck{rwlock};
     auto queueRange = consumeRanges[id];
+    slck.unlock();
 
+    return consumeRange(queueRange);
+}
+
+void IndexBuilderGlobalQueues::consumeAll() {
+    return consumeRange(std::make_pair(0, NUM_HASH_INDEXES));
+}
+
+void IndexBuilderGlobalQueues::consumeRange(std::pair<size_t, size_t> queueRange) {
     StringQueues* stringQueues = std::get_if<StringQueues>(&queues);
     if (stringQueues) {
         for (auto indexPos = queueRange.first; indexPos < queueRange.second; indexPos++) {
+            if (!consumeLocks[indexPos].try_lock()) {
+                continue;
+            }
+            std::unique_lock mtx{consumeLocks[indexPos], std::adopt_lock};
+
             StringBuffer elem;
             while ((*stringQueues)[indexPos].pop(elem)) {
                 for (auto i = 0u; i < elem.size(); i++) {
@@ -40,6 +56,11 @@ void IndexBuilderGlobalQueues::consume(size_t id) {
     } else {
         IntQueues& intQueues = std::get<IntQueues>(queues);
         for (auto indexPos = queueRange.first; indexPos < queueRange.second; indexPos++) {
+            if (!consumeLocks[indexPos].try_lock()) {
+                continue;
+            }
+            std::unique_lock mtx{consumeLocks[indexPos], std::adopt_lock};
+
             IntBuffer elem;
             while (intQueues[indexPos].pop(elem)) {
                 for (auto i = 0u; i < elem.size(); i++) {
@@ -59,43 +80,25 @@ void IndexBuilderGlobalQueues::flushToDisk() const {
 }
 
 size_t IndexBuilderGlobalQueues::addWorker() {
-    std::unique_lock xlck{mtx};
+    std::unique_lock xlck{rwlock};
     auto id = nextID++;
-    activeWorkers.push_back(id);
-    consumeRanges.emplace_back();
-    updateRangesNoLock();
+    if (id == 0) {
+        consumeRanges.emplace_back(0, NUM_HASH_INDEXES);
+        nextSplit = 0;
+        lastSplit = 1;
+    } else {
+        auto [lo, hi] = consumeRanges[nextSplit];
+        auto mid = (lo + hi) / 2;
+        consumeRanges[nextSplit] = {lo, mid};
+        consumeRanges.emplace_back(mid, hi);
+
+        nextSplit++;
+        if (nextSplit == lastSplit) {
+            nextSplit = 0;
+            lastSplit *= 2;
+        }
+    }
     return id;
-}
-
-void IndexBuilderGlobalQueues::workerQuit(size_t id) {
-    std::unique_lock xlck{mtx};
-    auto it = std::find(activeWorkers.begin(), activeWorkers.end(), id);
-    KU_ASSERT(it != activeWorkers.end());
-    activeWorkers.erase(it);
-    updateRangesNoLock();
-}
-
-void IndexBuilderGlobalQueues::updateRangesNoLock() {
-    auto workerCount = activeWorkers.size();
-    if (workerCount == 0) {
-        return;
-    }
-
-    auto indexesPerWorker = NUM_HASH_INDEXES / workerCount;
-    auto remainingIndexes = NUM_HASH_INDEXES % workerCount;
-    auto currentTot = 0;
-    for (auto i = 0u; i < remainingIndexes; i++) {
-        auto id = activeWorkers[i];
-        consumeRanges[id].first = currentTot;
-        currentTot += indexesPerWorker + 1;
-        consumeRanges[id].second = currentTot;
-    }
-    for (auto i = remainingIndexes; i < workerCount; i++) {
-        auto id = activeWorkers[i];
-        consumeRanges[id].first = currentTot;
-        currentTot += indexesPerWorker;
-        consumeRanges[id].second = currentTot;
-    }
 }
 
 IndexBuilderConsumer::IndexBuilderConsumer(IndexBuilderGlobalQueues& globalQueues)
@@ -145,6 +148,16 @@ void IndexBuilderLocalBuffers::flush() {
 IndexBuilderSharedState::IndexBuilderSharedState(std::unique_ptr<PrimaryKeyIndexBuilder> pkIndex)
     : globalQueues(std::move(pkIndex)) {}
 
+void IndexBuilderSharedState::producerStart() {
+    producers.fetch_add(1, std::memory_order_relaxed);
+}
+
+void IndexBuilderSharedState::producerQuit() {
+    if (producers.fetch_sub(1, std::memory_order_relaxed) == 1) {
+        done.store(true, std::memory_order_relaxed);
+    }
+}
+
 IndexBuilder::IndexBuilder(std::shared_ptr<IndexBuilderSharedState> sharedState)
     : sharedState(std::move(sharedState)), consumer(this->sharedState->globalQueues),
       localBuffers(this->sharedState->globalQueues) {}
@@ -155,6 +168,7 @@ IndexBuilder::IndexBuilder(std::unique_ptr<PrimaryKeyIndexBuilder> pkIndex)
     : IndexBuilder(std::make_shared<IndexBuilderSharedState>(std::move(pkIndex))) {}
 
 void IndexBuilder::initLocalStateInternal(ExecutionContext* /*context*/) {
+    sharedState->producerStart();
     consumer.init();
 }
 
@@ -183,13 +197,19 @@ void IndexBuilder::insert(ColumnChunk* chunk, offset_t nodeOffset, offset_t numN
 
 void IndexBuilder::finishedProducing() {
     localBuffers.flush();
-    consumer.quit();
+    sharedState->producerQuit();
+
+    consume();
+    while (!sharedState->isDone()) {
+        std::this_thread::sleep_for(std::chrono::microseconds(500));
+        consume();
+    }
 }
 
 void IndexBuilder::finalize(ExecutionContext* /*context*/) {
     localBuffers.flush();
-    consumer.consume();
-    sharedState->flush();
+    sharedState->consumeAll();
+    // sharedState->flush();
 }
 
 void IndexBuilder::checkNonNullConstraint(NullColumnChunk* nullChunk, offset_t numNodes) {

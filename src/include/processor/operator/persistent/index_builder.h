@@ -21,6 +21,7 @@ public:
     explicit IndexBuilderGlobalQueues(std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex);
 
     void consume(size_t id);
+    void consumeAll();
     void flushToDisk() const;
 
     void insert(size_t index, StringBuffer elem) {
@@ -33,17 +34,17 @@ public:
     common::LogicalTypeID pkTypeID() const { return pkIndex->keyTypeID(); }
 
     size_t addWorker();
-    void workerQuit(size_t id);
 
 private:
-    void updateRangesNoLock();
+    void consumeRange(std::pair<size_t, size_t> queueRange);
 
-    std::shared_mutex mtx;
-    std::vector<std::pair<size_t, size_t>> consumeRanges;
-    std::vector<size_t> activeWorkers;
-
-    std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex;
+    std::shared_mutex rwlock;
     size_t nextID;
+    size_t nextSplit, lastSplit;
+    std::vector<std::pair<size_t, size_t>> consumeRanges;
+
+    std::array<std::mutex, storage::NUM_HASH_INDEXES> consumeLocks;
+    std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex;
 
     using StringQueues = std::array<MPSCQueue<StringBuffer>, storage::NUM_HASH_INDEXES>;
     using IntQueues = std::array<MPSCQueue<IntBuffer>, storage::NUM_HASH_INDEXES>;
@@ -58,7 +59,6 @@ public:
 
     void init();
     void consume() { globalQueues->consume(id); }
-    void quit() { globalQueues->workerQuit(id); }
 
 private:
     IndexBuilderGlobalQueues* globalQueues;
@@ -90,9 +90,17 @@ class IndexBuilderSharedState {
 public:
     explicit IndexBuilderSharedState(std::unique_ptr<storage::PrimaryKeyIndexBuilder> pkIndex);
     void init();
+    void consumeAll() { globalQueues.consumeAll(); }
     void flush() { globalQueues.flushToDisk(); }
 
+    void producerStart();
+    void producerQuit();
+
+    bool isDone() const { return done.load(std::memory_order_relaxed); }
+
 private:
+    std::atomic<size_t> producers;
+    std::atomic<bool> done;
     IndexBuilderGlobalQueues globalQueues;
 };
 
