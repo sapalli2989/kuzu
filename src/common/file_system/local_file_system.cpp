@@ -145,10 +145,6 @@ bool LocalFileSystem::fileOrPathExists(const std::string& path) {
     return std::filesystem::exists(path);
 }
 
-std::string LocalFileSystem::joinPath(const std::string& base, const std::string& part) {
-    return (std::filesystem::path(base) / part).string();
-}
-
 void LocalFileSystem::readFromFile(
     FileInfo* fileInfo, void* buffer, uint64_t numBytes, uint64_t position) {
     auto localFileInfo = ku_dynamic_cast<FileInfo*, LocalFileInfo*>(fileInfo);

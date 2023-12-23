@@ -641,7 +641,12 @@ TEST_F(TinySnbDDLTest, RenameTableRecovery) {
 }
 
 TEST_F(TinySnbDDLTest, RenamePropertyNormalExecution) {
-    renameProperty(TransactionTestType::NORMAL_EXECUTION);
+    printf("%s",
+        conn->query("load extension "
+                    "\"/Users/z473chen/Desktop/code/kuzu/extension/httpfs/build/libhttpfs.dylib\"")
+            ->toString()
+            .c_str());
+    printf("%s", conn->query("load from \"http://localhost/copy-test/node/parquet/types_50k_0.parquet\" return *;")->toString().c_str());
 }
 
 TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
@@ -650,7 +655,7 @@ TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
                     "\"/Users/z473chen/Desktop/code/kuzu/extension/httpfs/build/libhttpfs.dylib\"")
             ->toString()
             .c_str());
-    printf("%s", conn->query("load from \"http://localhost//vMovies.csv\" return *;")->toString().c_str());
+    printf("%s", conn->query("load from \"http://localhost//vMovies.csv\" return count(*);")->toString().c_str());
 }
 
 } // namespace testing

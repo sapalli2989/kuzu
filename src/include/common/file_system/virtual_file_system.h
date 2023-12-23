@@ -28,8 +28,6 @@ public:
 
     bool fileOrPathExists(const std::string& path) override;
 
-    std::string joinPath(const std::string& base, const std::string& part) override;
-
 protected:
     void readFromFile(
         FileInfo* fileInfo, void* buffer, uint64_t numBytes, uint64_t position) override;

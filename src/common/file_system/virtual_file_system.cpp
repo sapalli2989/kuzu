@@ -48,10 +48,6 @@ bool VirtualFileSystem::fileOrPathExists(const std::string& path) {
     return findFileSystem(path)->fileOrPathExists(path);
 }
 
-std::string VirtualFileSystem::joinPath(const std::string& base, const std::string& part) {
-    return findFileSystem(base)->joinPath(base, part);
-}
-
 void VirtualFileSystem::readFromFile(
     FileInfo* /*fileInfo*/, void* /*buffer*/, uint64_t /*numBytes*/, uint64_t /*position*/) {
     KU_UNREACHABLE;

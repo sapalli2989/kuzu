@@ -7,7 +7,6 @@
 	clangd tidy clangd-diagnostics \
 	install \
 	clean-python-api clean-java clean \
-	extension \
 
 .ONESHELL:
 .SHELLFLAGS = -ec
@@ -149,12 +148,15 @@ benchmark:
 example:
 	$(call run-cmake-release, -DBUILD_EXAMPLES=TRUE)
 
-extension:
-	$(call run-extension)
+extension-debug:
+	$(call run-extension,Debug)
 
-extension-test: extension
-	$(call run-cmake-release, -DBUILD_TESTS=TRUE)
-	ctest --test-dir extension/httpfs/build/test --output-on-failure -j ${TEST_JOBS}
+extension-release:
+	$(call run-extension,Release)
+
+extension-test: extension-release
+	$(call run-cmake-release,-DBUILD_EXTENSION_TESTS=TRUE)
+	ctest --test-dir build/release/extension/httpfs/test --output-on-failure -j ${TEST_JOBS}
 
 # Clang-related tools and checks
 
@@ -226,14 +228,14 @@ define run-cmake-release
 endef
 
 define config-extension
-	cmake -B extension/httpfs/build -DCMAKE_BUILD_TYPE=Release. -S extension/httpfs
+	cmake -B extension/httpfs/build -DCMAKE_BUILD_TYPE=$1 -S extension/httpfs $2
 endef
 
 define build-extension
-	cmake --build extension/httpfs/build --config Release
+	cmake --build extension/httpfs/build --config $1
 endef
 
 define run-extension
-	$(call config-extension)
-	$(call build-extension)
+	$(call config-extension,$1,$2)
+	$(call build-extension,$1,$2)
 endef

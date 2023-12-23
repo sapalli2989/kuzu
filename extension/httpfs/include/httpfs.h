@@ -27,35 +27,29 @@ struct HTTPParams {
     static constexpr bool DEFAULT_KEEP_ALIVE = true;
 };
 
-class HTTPFileInfo : public common::FileInfo {
-public:
+struct HTTPFileInfo : public common::FileInfo {
     HTTPFileInfo(std::string path, common::FileSystem* fileSystem, int flags);
 
     // We keep a http client stored for connection reuse with keep-alive headers
     std::unique_ptr<httplib::Client> httpClient;
 
-    // File handle info
     int flags;
     uint64_t length;
-    time_t last_modified;
 
-    // Read info
-    uint64_t buffer_available;
-    uint64_t buffer_idx;
-    uint64_t file_offset;
-    uint64_t buffer_start;
-    uint64_t buffer_end;
+    uint64_t availableBuffer;
+    uint64_t bufferIdx;
+    uint64_t fileOffset;
+    uint64_t bufferStartPos;
+    uint64_t bufferEndPos;
 
-    // Read buffer
     std::unique_ptr<uint8_t[]> readBuffer;
     constexpr static uint64_t READ_BUFFER_LEN = 1000000;
 
-protected:
     void initializeClient();
 };
 
 class HTTPFileSystem final : public common::FileSystem {
-    friend class HTTPFileInfo;
+    friend struct HTTPFileInfo;
 
 public:
     std::unique_ptr<common::FileInfo> openFile(
@@ -63,17 +57,7 @@ public:
 
     std::vector<std::string> glob(const std::string& path) override;
 
-    void overwriteFile(const std::string& from, const std::string& to) override { KU_UNREACHABLE; }
-
-    void createDir(const std::string& dir) override { KU_UNREACHABLE; }
-
-    void removeFileIfExists(const std::string& path) override { KU_UNREACHABLE; }
-
-    bool fileOrPathExists(const std::string& path) override { KU_UNREACHABLE; }
-
-    std::string joinPath(const std::string& base, const std::string& part) override {
-        KU_UNREACHABLE;
-    }
+    bool canHandleFile(const std::string& path) override;
 
 protected:
     void readFromFile(
@@ -81,18 +65,9 @@ protected:
 
     int64_t readFile(common::FileInfo* fileInfo, void* buf, size_t numBytes) override;
 
-    void writeFile(common::FileInfo* fileInfo, const uint8_t* buffer, uint64_t numBytes,
-        uint64_t offset) override {
-        KU_UNREACHABLE;
-    }
-
     int64_t seek(common::FileInfo* fileInfo, uint64_t offset, int whence) override;
 
-    void truncate(common::FileInfo* fileInfo, uint64_t size) override { KU_UNREACHABLE; }
-
     uint64_t getFileSize(common::FileInfo* fileInfo) override;
-
-    bool canHandleFile(const std::string& path) override;
 
 private:
     static std::unique_ptr<httplib::Client> getClient(const std::string& host);
