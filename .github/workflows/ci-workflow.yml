@@ -46,6 +46,11 @@ jobs:
         run: npm install --include=dev
         working-directory: tools/nodejs_api
 
+      - name: Extension test
+        run: |
+          cd scripts/ && python3 http-server.py &
+          make clean && make extension-test   
+
       - name: Build
         run: make all
 

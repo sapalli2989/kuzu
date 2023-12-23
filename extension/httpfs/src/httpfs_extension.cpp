@@ -13,7 +13,6 @@ void HttpfsExtension::load(main::Database& db) {
 } // namespace kuzu
 
 extern "C" {
-
 void init(kuzu::main::Database& db) {
     kuzu::httpfs::HttpfsExtension::load(db);
 }

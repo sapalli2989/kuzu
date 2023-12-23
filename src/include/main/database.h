@@ -83,7 +83,6 @@ public:
     void addBuiltInFunction(
         std::string name, std::vector<std::unique_ptr<function::Function>> functionSet);
 
-
     KUZU_API void registerFileSystem(std::unique_ptr<common::FileSystem> fs);
 
 private:

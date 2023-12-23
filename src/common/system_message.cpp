@@ -29,7 +29,7 @@ std::string getDLError() {
 
     return message;
 #else
-    return dlerror();
+    return dlerror(); // NOLINT(concurrency-mt-unsafe): load can only be executed in single thread.
 #endif
 }
 
