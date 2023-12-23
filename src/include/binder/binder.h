@@ -163,6 +163,9 @@ private:
     /*** bind transaction ***/
     std::unique_ptr<BoundStatement> bindTransaction(const parser::Statement& statement);
 
+    /*** bind load ***/
+    std::unique_ptr<BoundStatement> bindLoad(const parser::Statement& statement);
+
     /*** bind comment on ***/
     std::unique_ptr<BoundStatement> bindCommentOn(const parser::Statement& statement);
 

@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.15)
+
+project(HTTPFsExtension)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+include_directories(include ../../third_party/httplib ../../src/include)
+
+add_library(httpfs
+        SHARED
+        src/httpfs.cpp
+        src/httpfs_extension.cpp)
+
+target_link_libraries(httpfs
+        PRIVATE
+        dl  # For dlopen, dlsym, etc.
+)
+
+set_target_properties(httpfs PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")

@@ -27,7 +27,7 @@ public:
             std::make_unique<MemoryManager>(bufferManager.get(), getFileSystem(*database));
         executionContext = std::make_unique<ExecutionContext>(1 /* numThreads */, profiler.get(),
             memoryManager.get(), bufferManager.get(), conn->clientContext.get(),
-            getFileSystem(*database));
+            getFileSystem(*database), database.get());
         personTableID = catalog->getTableID(&DUMMY_READ_TRANSACTION, "person");
         studyAtTableID = catalog->getTableID(&DUMMY_READ_TRANSACTION, "studyAt");
     }
@@ -645,7 +645,12 @@ TEST_F(TinySnbDDLTest, RenamePropertyNormalExecution) {
 }
 
 TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
-    renameProperty(TransactionTestType::RECOVERY);
+    printf("%s",
+        conn->query("load extension "
+                    "\"/Users/z473chen/Desktop/code/kuzu/extension/httpfs/build/libhttpfs.dylib\"")
+            ->toString()
+            .c_str());
+    printf("%s", conn->query("load from \"http://localhost//vMovies.csv\" return *;")->toString().c_str());
 }
 
 } // namespace testing

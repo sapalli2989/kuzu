@@ -7,6 +7,7 @@
 	clangd tidy clangd-diagnostics \
 	install \
 	clean-python-api clean-java clean \
+	extension \
 
 .ONESHELL:
 .SHELLFLAGS = -ec
@@ -64,12 +65,13 @@ allconfig:
 		-DBUILD_PYTHON=TRUE \
 		-DBUILD_SHELL=TRUE \
 		-DBUILD_TESTS=TRUE \
+		-DBUILD_EXTENSIONS=TRUE \
 	)
 
-all: allconfig
+all: allconfig extension
 	$(call build-cmake-release)
 
-alldebug:
+alldebug: extension
 	$(call run-cmake-debug, \
 		-DBUILD_BENCHMARK=TRUE \
 		-DBUILD_EXAMPLES=TRUE \
@@ -82,7 +84,7 @@ alldebug:
 
 
 # Main tests
-test:
+test: extension
 	$(call run-cmake-release, -DBUILD_TESTS=TRUE)
 	ctest --test-dir build/release/test --output-on-failure -j ${TEST_JOBS}
 
@@ -147,6 +149,12 @@ benchmark:
 example:
 	$(call run-cmake-release, -DBUILD_EXAMPLES=TRUE)
 
+extension:
+	$(call run-extension)
+
+extension-test: extension
+	$(call run-cmake-release, -DBUILD_TESTS=TRUE)
+	ctest --test-dir extension/httpfs/build/test --output-on-failure -j ${TEST_JOBS}
 
 # Clang-related tools and checks
 
@@ -179,7 +187,10 @@ clean-python-api:
 clean-java:
 	cmake -E rm -rf tools/java_api/build
 
-clean: clean-python-api clean-java
+clean-extension:
+	cmake -E rm -rf extension/*/build
+
+clean: clean-python-api clean-java clean-extension
 	cmake -E rm -rf build
 
 
@@ -212,4 +223,17 @@ endef
 define run-cmake-release
 	$(call config-cmake-release,$1)
 	$(call build-cmake-release,$1)
+endef
+
+define config-extension
+	cmake -B extension/httpfs/build -DCMAKE_BUILD_TYPE=Release. -S extension/httpfs
+endef
+
+define build-extension
+	cmake --build extension/httpfs/build --config Release
+endef
+
+define run-extension
+	$(call config-extension)
+	$(call build-extension)
 endef

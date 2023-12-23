@@ -50,6 +50,9 @@ std::unique_ptr<BoundStatement> Binder::bind(const Statement& statement) {
     case StatementType::TRANSACTION: {
         boundStatement = bindTransaction(statement);
     } break;
+    case StatementType::LOAD: {
+        boundStatement = bindLoad(statement);
+    } break;
     default: {
         KU_UNREACHABLE;
     }

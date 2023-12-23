@@ -5,7 +5,7 @@ file(READ Cypher.g4.copy COPY_CONTENT)
 file(READ ${ROOT_DIR}/src/antlr4/Cypher.g4 REAL_CONTENT)
 
 if("${COPY_CONTENT}" STREQUAL "${REAL_CONTENT}")
-    message(DEBUG " Not regenerating grammar files as Cypher.g4 is unchanged.")
+    message(ERROR " Not regenerating grammar files as Cypher.g4 is unchanged.")
     return() # Exit.
 endif()
 

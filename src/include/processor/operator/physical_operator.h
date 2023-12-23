@@ -41,6 +41,7 @@ enum class PhysicalOperatorType : uint8_t {
     INTERSECT_BUILD,
     INTERSECT,
     LIMIT,
+    LOAD,
     MERGE,
     MULTIPLICITY_REDUCER,
     PARTITIONER,

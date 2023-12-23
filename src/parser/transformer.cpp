@@ -40,6 +40,8 @@ std::unique_ptr<Statement> Transformer::transformStatement(CypherParser::OC_Stat
         return transformCommentOn(*ctx.kU_CommentOn());
     } else if (ctx.kU_Transaction()) {
         return transformTransaction(*ctx.kU_Transaction());
+    } else if (ctx.kU_Load()) {
+        return transformLoad(*ctx.kU_Load());
     } else {
         KU_UNREACHABLE;
     }

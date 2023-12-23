@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <vector>
 
+#include "common/assert.h"
 #include "file_info.h"
 
 namespace kuzu {
@@ -31,7 +32,9 @@ public:
 
     virtual std::string joinPath(const std::string& base, const std::string& part) = 0;
 
-    virtual std::string getFileExtension(const std::filesystem::path& path) = 0;
+    std::string getFileExtension(const std::filesystem::path& path);
+
+    virtual bool canHandleFile(const std::string& /*path*/) { KU_UNREACHABLE; }
 
 protected:
     virtual void readFromFile(
