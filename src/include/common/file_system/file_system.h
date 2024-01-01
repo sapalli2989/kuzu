@@ -15,7 +15,7 @@ class KUZU_API FileSystem {
     friend struct FileInfo;
 
 public:
-    virtual ~FileSystem() = default;
+    KUZU_API virtual ~FileSystem() = default;
 
     KUZU_API virtual std::unique_ptr<FileInfo> openFile(
         const std::string& path, int flags, FileLockType lock_type = FileLockType::NO_LOCK) = 0;

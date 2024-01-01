@@ -17,4 +17,11 @@ target_link_libraries(httpfs
         dl  # For dlopen, dlsym, etc.
 )
 
-set_target_properties(httpfs PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+set_target_properties(httpfs PROPERTIES
+        OUTPUT_NAME httpfs
+        SUFFIX ""
+)
+
+if (APPLE)
+    set_target_properties(httpfs PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+endif ()
