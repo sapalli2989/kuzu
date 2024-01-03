@@ -15,12 +15,12 @@ class KUZU_API FileSystem {
     friend struct FileInfo;
 
 public:
-    KUZU_API virtual ~FileSystem() = default;
+    virtual ~FileSystem() = default;
 
-    KUZU_API virtual std::unique_ptr<FileInfo> openFile(
+    virtual std::unique_ptr<FileInfo> openFile(
         const std::string& path, int flags, FileLockType lock_type = FileLockType::NO_LOCK) = 0;
 
-    KUZU_API virtual std::vector<std::string> glob(const std::string& path) = 0;
+    virtual std::vector<std::string> glob(const std::string& path) = 0;
 
     virtual void overwriteFile(const std::string& from, const std::string& to);
 
@@ -34,22 +34,22 @@ public:
 
     static std::string getFileExtension(const std::filesystem::path& path);
 
-    KUZU_API virtual bool canHandleFile(const std::string& /*path*/) { KU_UNREACHABLE; }
+    virtual bool canHandleFile(const std::string& /*path*/) { KU_UNREACHABLE; }
 
 protected:
-    KUZU_API virtual void readFromFile(
+    virtual void readFromFile(
         FileInfo* fileInfo, void* buffer, uint64_t numBytes, uint64_t position) = 0;
 
-    KUZU_API virtual int64_t readFile(FileInfo* fileInfo, void* buf, size_t nbyte) = 0;
+    virtual int64_t readFile(FileInfo* fileInfo, void* buf, size_t nbyte) = 0;
 
-    KUZU_API virtual void writeFile(
+    virtual void writeFile(
         FileInfo* fileInfo, const uint8_t* buffer, uint64_t numBytes, uint64_t offset);
 
-    KUZU_API virtual int64_t seek(FileInfo* fileInfo, uint64_t offset, int whence) = 0;
+    virtual int64_t seek(FileInfo* fileInfo, uint64_t offset, int whence) = 0;
 
-    KUZU_API virtual void truncate(FileInfo* fileInfo, uint64_t size);
+    virtual void truncate(FileInfo* fileInfo, uint64_t size);
 
-    KUZU_API virtual uint64_t getFileSize(FileInfo* fileInfo) = 0;
+    virtual uint64_t getFileSize(FileInfo* fileInfo) = 0;
 };
 
 } // namespace common
