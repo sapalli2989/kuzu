@@ -760,11 +760,7 @@ impl TryInto<cxx::UniquePtr<ffi::Value>> for Value {
                 let typ: LogicalType = LogicalType::Struct {
                     fields: value
                         .iter()
-                        .map(|(name, value)| {
-                            // Unwrap is safe since we already converted when inserting into the
-                            // builder
-                            (name.clone(), Into::<LogicalType>::into(value))
-                        })
+                        .map(|(name, value)| (name.clone(), Into::<LogicalType>::into(value)))
                         .collect(),
                 };
 
@@ -1205,9 +1201,7 @@ mod tests {
         Ok(())
     }
 
-    // TODO: This should be added back after we fix create rel.
     #[test]
-    #[ignore]
     fn test_recursive_rel() -> Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let db = Database::new(temp_dir.path(), SystemConfig::default())?;

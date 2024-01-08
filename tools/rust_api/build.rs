@@ -64,6 +64,9 @@ fn build_bundled_cmake() -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
         .define("BUILD_SHELL", "OFF")
         .define("BUILD_SINGLE_FILE_HEADER", "OFF")
         .define("AUTO_UPDATE_GRAMMAR", "OFF");
+    if get_target() == "debug" {
+        build.define("ENABLE_RUNTIME_CHECKS", "ON");
+    }
     if cfg!(windows) {
         build.generator("Ninja");
         build.cxxflag("/EHsc");

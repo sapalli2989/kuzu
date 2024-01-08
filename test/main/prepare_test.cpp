@@ -1,3 +1,4 @@
+#include "common/types/value/nested.h"
 #include "main_test_helper/main_test_helper.h"
 
 using namespace kuzu::common;
@@ -130,6 +131,28 @@ TEST_F(ApiTest, PrepareDefaultStructParam) {
     ASSERT_FALSE(result->isSuccess());
     ASSERT_STREQ(
         result->getErrorMessage().c_str(), "Parameter 1 has data type INT32 but expects STRING.");
+}
+
+TEST_F(ApiTest, PrepareStructParam) {
+    conn->query(
+        "CREATE NODE TABLE Struct(ID SERIAL, item STRUCT(A STRING, B UINT8), PRIMARY KEY(ID));");
+    auto preparedStatement = conn->prepare("CREATE (:Struct {item: $item});");
+    std::vector<StructField> childTypes;
+    childTypes.emplace_back("A", LogicalType::STRING());
+    childTypes.emplace_back("B", LogicalType::UINT8());
+    std::vector<std::unique_ptr<Value>> children;
+    children.push_back(std::make_unique<Value>("Foo"));
+    children.push_back(std::make_unique<Value>((uint8_t)1));
+    auto structVal = Value(LogicalType::STRUCT(std::move(childTypes)), std::move(children));
+    conn->execute(preparedStatement.get(), std::make_pair(std::string("item"), structVal));
+    auto result = conn->query("MATCH (a:Struct) RETURN a.item");
+    ASSERT_TRUE(result->hasNext());
+    auto resultTuple = result->getNext();
+    checkTuple(resultTuple.get(), "{A: Foo, B: 1}\n");
+    auto value = resultTuple->getValue(0);
+    ASSERT_EQ(NestedVal::getChildrenSize(value), 2);
+    ASSERT_EQ(NestedVal::getChildVal(value, 0)->getValue<std::string>(), "Foo");
+    ASSERT_EQ(NestedVal::getChildVal(value, 1)->getValue<uint8_t>(), 1);
 }
 
 TEST_F(ApiTest, PrepareDefaultMapParam) {
