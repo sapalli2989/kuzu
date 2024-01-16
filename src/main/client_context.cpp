@@ -27,6 +27,7 @@ ClientContext::ClientContext(Database* database)
       varLengthExtendMaxDepth{DEFAULT_VAR_LENGTH_EXTEND_MAX_DEPTH}, enableSemiMask{
                                                                         DEFAULT_ENABLE_SEMI_MASK} {
     transactionContext = std::make_unique<TransactionContext>(database);
+    randomEngine = std::make_unique<common::RandomEngine>();
     for (auto& [name, option] : database->extensionOptions->getExtensionOptions()) {
         StringUtils::toLower(option.name);
         extensionOptionValues.emplace(option.name, option.defaultValue);

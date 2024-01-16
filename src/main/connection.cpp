@@ -236,8 +236,8 @@ std::unique_ptr<QueryResult> Connection::executeAndAutoCommitIfNecessaryNoLock(
     }
     clientContext->resetActiveQuery();
     clientContext->startTimingIfEnabled();
-    auto mapper = PlanMapper(
-        *database->storageManager, database->memoryManager.get(), database->catalog.get());
+    auto mapper = PlanMapper(*database->storageManager, database->memoryManager.get(),
+        database->catalog.get(), clientContext.get());
     std::unique_ptr<PhysicalPlan> physicalPlan;
     if (preparedStatement->isSuccess()) {
         try {
