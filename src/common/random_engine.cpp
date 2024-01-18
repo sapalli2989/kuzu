@@ -1,18 +1,16 @@
 #include "common/random_engine.h"
-
+#include "pcg_random.hpp"
 #include <random>
 
 namespace kuzu {
 namespace common {
 
-RandomEngine::RandomEngine() : randomState(RandomState()) {
-    randomState.pcg.seed(pcg_extras::seed_seq_from<std::random_device>());
+RandomEngine::RandomEngine() : randomState(std::unique_ptr<RandomState>()) {
+    randomState->pcg.seed(pcg_extras::seed_seq_from<std::random_device>());
 }
 
-RandomEngine::~RandomEngine() {}
-
 uint32_t RandomEngine::nextRandomInteger() {
-    return randomState.pcg();
+    return randomState->pcg();
 }
 
 } // namespace common

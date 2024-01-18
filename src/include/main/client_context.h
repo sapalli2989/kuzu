@@ -5,7 +5,6 @@
 #include <functional>
 #include <memory>
 
-#include "common/random_engine.h"
 #include "common/timer.h"
 #include "common/types/value/value.h"
 #include "main/kuzu_fwd.h"

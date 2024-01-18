@@ -20,8 +20,7 @@ struct GenRandomUUID {
         auto resultValues = (common::uuid_t*)result.getData();
         auto idx = result.state->selVector->selectedPositions[0];
         KU_ASSERT(idx == 0);
-        resultValues[idx] = common::uuid_t::generateRandomUUID(
-            reinterpret_cast<main::ClientContext*>(dataPtr)->getRandomEngine());
+        resultValues[idx] = common::uuid_t::generateRandomUUID(reinterpret_cast<main::ClientContext*>(dataPtr)->getRandomEngine());
     }
 };
 

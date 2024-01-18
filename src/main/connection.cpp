@@ -4,6 +4,7 @@
 
 #include "binder/binder.h"
 #include "common/exception/connection.h"
+#include "common/random_engine.h"
 #include "main/database.h"
 #include "optimizer/optimizer.h"
 #include "parser/parser.h"
@@ -30,7 +31,6 @@ Connection::Connection(Database* database) {
     this->database = database;
     clientContext = std::make_unique<ClientContext>(database);
 }
-
 Connection::~Connection() {}
 
 void Connection::beginReadOnlyTransaction() {

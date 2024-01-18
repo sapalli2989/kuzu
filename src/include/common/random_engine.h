@@ -24,7 +24,7 @@ public:
     uint32_t nextRandomInteger();
 
 private:
-    RandomState randomState;
+    std::unique_ptr<RandomState> randomState;
 };
 } // namespace common
 } // namespace kuzu

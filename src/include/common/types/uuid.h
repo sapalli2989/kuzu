@@ -45,7 +45,7 @@ struct uuid_t {
     int128_t value;
 
     // generate a random uuid object
-    static uuid_t generateRandomUUID(RandomEngine* engine);
+    static uuid_t generateRandomUUID(RandomEngine* randomEngine);
 };
 
 } // namespace common
