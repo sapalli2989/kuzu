@@ -25,11 +25,9 @@ ifeq ($(OS),Windows_NT)
 	.SHELLFLAGS := /c
 endif
 ifeq ($(OS),Windows_NT)
-	AWS_CONFIG_DIR := C:\Users\runner\.aws
-	AWS_EXECUTABLE := "C:\Program Files\Amazon\AWSCLIV2\aws.exe"
+	AWS_CONFIG_DIR := $(USERPROFILE)\.aws
 else
 	AWS_CONFIG_DIR := ~/.aws
-	AWS_EXECUTABLE := aws
 endif
 
 ifeq ($(GEN),ninja)
@@ -171,7 +169,7 @@ extension-test:
 	echo aws_access_key_id = ${AWS_S3_ACCESS_KEY_ID} >> $(AWS_CONFIG_DIR)/credentials
 	echo aws_secret_access_key = ${AWS_S3_SECRET_ACCESS_KEY} >> $(AWS_CONFIG_DIR)/credentials
 	ctest --test-dir build/release/extension/httpfs/test --output-on-failure -j ${TEST_JOBS}
-	$(AWS_EXECUTABLE) s3 rm s3://kuzu-dataset-us/${RUN_ID}/ --recursive
+	aws s3 rm s3://kuzu-dataset-us/${RUN_ID}/ --recursive
 
 # Clang-related tools and checks
 

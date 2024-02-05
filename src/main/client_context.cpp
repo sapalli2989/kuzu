@@ -99,7 +99,7 @@ std::string ClientContext::getEnvVariable(const std::string& name) {
     if (!result) {
         return std::string();
     }
-    return WindowsUtils::unicodeToUTF8(reinterpret_cast<LPCWSTR>(result));
+    return WindowsUtils::unicodeToUTF8(result);
 #else
     const char* env = getenv(name.c_str()); // NOLINT(*-mt-unsafe)
     if (!env) {
