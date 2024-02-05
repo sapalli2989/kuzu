@@ -95,7 +95,7 @@ catalog::Catalog* ClientContext::getCatalog() {
 std::string ClientContext::getEnvVariable(const std::string& name) {
 #if defined(_WIN32)
     auto envValue = common::WindowsUtils::utf8ToUnicode(name.c_str());
-    auto result = getenv(reinterpret_cast<const char*>(envValue.c_str()));
+    auto result = _wgetenv(envValue.c_str());
     if (!result) {
         return std::string();
     }
