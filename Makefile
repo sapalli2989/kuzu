@@ -164,10 +164,6 @@ extension-test:
 		-DBUILD_EXTENSIONS=httpfs \
 		-DBUILD_EXTENSION_TESTS=TRUE \
 	)
-	cmake -E make_directory $(AWS_CONFIG_DIR)
-	echo [default] > $(AWS_CONFIG_DIR)/credentials
-	echo aws_access_key_id = ${AWS_S3_ACCESS_KEY_ID} >> $(AWS_CONFIG_DIR)/credentials
-	echo aws_secret_access_key = ${AWS_S3_SECRET_ACCESS_KEY} >> $(AWS_CONFIG_DIR)/credentials
 	ctest --test-dir build/release/extension/httpfs/test --output-on-failure -j ${TEST_JOBS}
 	aws s3 rm s3://kuzu-dataset-us/${RUN_ID}/ --recursive
 
