@@ -31,7 +31,13 @@ void CopyNodeSharedState::init(ExecutionContext* context) {
         } else {
             numRows = distinctSharedState->getFactorizedTable()->getNumTuples();
         }
-        pkIndex->bulkReserve(numRows);
+        if (numRows != UINT64_MAX) {
+            pkIndex->bulkReserve(numRows);
+            printf("%s\n", "bulkReserve error!!!!!!!!");
+            exit(5);
+        } else {
+            pkIndex->bulkReserve(0);
+        }
         globalIndexBuilder = IndexBuilder(std::make_shared<IndexBuilderSharedState>(pkIndex.get()));
     }
 }
