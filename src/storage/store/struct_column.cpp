@@ -1,6 +1,7 @@
 #include "storage/store/struct_column.h"
 
 #include "common/cast.h"
+#include "common/types/blob.h"
 #include "storage/store/null_column.h"
 #include "storage/store/struct_column_chunk.h"
 
@@ -68,6 +69,10 @@ void StructColumn::scanInternal(
         auto fieldVector = StructVector::getFieldVector(resultVector, i).get();
         childColumns[i]->scan(transaction, nodeIDVector, fieldVector);
     }
+    auto a = StructVector::getFieldVector(resultVector, 0)->getValue<uint8_t>(0);
+    auto b = StructVector::getFieldVector(resultVector, 1)->getValue<common::blob_t>(0);
+    auto c = reinterpret_cast<const blob_t*>(b.value.getData());
+    auto d = 5;
 }
 
 void StructColumn::lookupInternal(

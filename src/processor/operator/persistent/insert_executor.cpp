@@ -51,6 +51,11 @@ void NodeInsertExecutor::insert(Transaction* tx, ExecutionContext* context) {
         evaluator->evaluate(context->clientContext);
     }
     KU_ASSERT(nodeIDVector->state->selVector->selectedSize == 1);
+    auto struct1 = StructVector::getFieldVector(columnDataVectors[1], 0);
+    auto struct2 = StructVector::getFieldVector(columnDataVectors[1], 1);
+    auto type1 = struct1->getValue<uint8_t>(0);
+    auto type2 = struct2->getValue<blob_t>(0);
+    auto data = reinterpret_cast<const blob_t*>(type2.value.getData());
     if (conflictAction == ConflictAction::ON_CONFLICT_DO_NOTHING) {
         auto off = table->validateUniquenessConstraint(tx, columnDataVectors);
         if (off != INVALID_OFFSET) {

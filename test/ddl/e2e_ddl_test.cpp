@@ -468,5 +468,18 @@ TEST_F(TinySnbDDLTest, RenamePropertyRecovery) {
     renameProperty(TransactionTestType::RECOVERY);
 }
 
+TEST_F(TinySnbDDLTest, RenamePropertyRecovery1) {
+    conn->query("CREATE RDFGraph T;");
+    conn->query("CREATE (:T_l {val: blob(\"Long string that doesn't fit in ku_string_t\")});");
+    printf("%s", conn->query("MATCH (a:T_l) RETURN a.val;")->toString().c_str());
+}
+
+TEST_F(TinySnbDDLTest, RenamePropertyRecovery11) {
+    conn->query("CREATE node table person1 (id int64, a blob, primary key(id));");
+    conn->query(
+        "CREATE (:person1 {id: 5, a: blob(\"Long string that doesn't fit in ku_string_t\")});");
+    printf("%s", conn->query("MATCH (a:person1) RETURN a.a;")->toString().c_str());
+}
+
 } // namespace testing
 } // namespace kuzu

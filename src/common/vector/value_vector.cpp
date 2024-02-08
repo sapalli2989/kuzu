@@ -81,6 +81,28 @@ void ValueVector::copyFromRowData(uint32_t pos, const uint8_t* rowData) {
 
 void ValueVector::copyToRowData(
     uint32_t pos, uint8_t* rowData, InMemOverflowBuffer* rowOverflowBuffer) const {
+    if (dataType.getLogicalTypeID() == LogicalTypeID::RDF_VARIANT) {
+        // The storage structure of STRUCT type in factorizedTable is:
+        // [NULLBYTES, FIELD1, FIELD2, ...]
+        auto& structFields = StructVector::getFieldVectors(this);
+        NullBuffer::initNullBytes(rowData, structFields.size());
+        auto structNullBytes = rowData;
+        auto structValues =
+            structNullBytes + NullBuffer::getNumBytesForNullValues(structFields.size());
+        auto structField = structFields[0];
+        NullBuffer::setNoNull(structNullBytes, 0);
+        NullBuffer::setNoNull(structNullBytes, 1);
+        structField->copyToRowData(pos, structValues, rowOverflowBuffer);
+        structValues += LogicalTypeUtils::getRowLayoutSize(structField->dataType);
+        auto blobData = (blob_t*)(structFields[1]->getValue<blob_t>(pos).value.overflowPtr);
+        if (structFields[0]->getValue<uint8_t>(pos) == 51) {
+            auto space = rowOverflowBuffer->allocateSpace(blobData->value.len);
+            memcpy(space, blobData->value.getData(), blobData->value.len);
+            blobData->value.overflowPtr = reinterpret_cast<uint64_t>(space);
+        }
+        structFields[1]->copyToRowData(pos, structValues, rowOverflowBuffer);
+        return;
+    }
     switch (dataType.getPhysicalType()) {
     case PhysicalTypeID::STRUCT: {
         StructVector::copyToRowData(this, pos, rowData, rowOverflowBuffer);
@@ -670,19 +692,40 @@ void FixedListVector::getAsValue<double>(ValueVector* vector,
 }
 
 void StructVector::copyFromRowData(ValueVector* vector, uint32_t pos, const uint8_t* rowData) {
+
     KU_ASSERT(vector->dataType.getPhysicalType() == PhysicalTypeID::STRUCT);
     auto& structFields = getFieldVectors(vector);
     auto structNullBytes = rowData;
     auto structValues = structNullBytes + NullBuffer::getNumBytesForNullValues(structFields.size());
-    for (auto i = 0u; i < structFields.size(); i++) {
-        auto structField = structFields[i];
-        if (NullBuffer::isNull(structNullBytes, i)) {
-            structField->setNull(pos, true /* isNull */);
-        } else {
-            structField->setNull(pos, false /* isNull */);
-            structField->copyFromRowData(pos, structValues);
-        }
+    if (vector->dataType.getLogicalTypeID() == LogicalTypeID::RDF_VARIANT) {
+        auto structField = structFields[0];
+        KU_ASSERT(!NullBuffer::isNull(structNullBytes, 0));
+        structField->setNull(pos, false /* isNull */);
+        structField->copyFromRowData(pos, structValues);
         structValues += LogicalTypeUtils::getRowLayoutSize(structField->dataType);
+        auto blob = reinterpret_cast<const blob_t*>(structValues);
+        structFields[1]->setNull(pos, false /* isNull */);
+        structFields[1]->copyFromRowData(pos, structValues);
+        if (structField->getValue<uint8_t>(pos) == 56) {
+            auto& val = structFields[1]->getValue<blob_t>(pos);
+            auto blobval = (blob_t*)(val.value.getData());
+            auto stringBuffer = ku_dynamic_cast<AuxiliaryBuffer*, StringAuxiliaryBuffer*>(
+                structFields[1]->auxiliaryBuffer.get());
+            auto space = stringBuffer->allocateOverflow(blobval->value.len);
+            memcpy(space, blobval->value.getData(), blobval->value.len);
+            blobval->value.overflowPtr = reinterpret_cast<uint64_t>(space);
+        }
+    } else {
+        for (auto i = 0u; i < structFields.size(); i++) {
+            auto structField = structFields[i];
+            if (NullBuffer::isNull(structNullBytes, i)) {
+                structField->setNull(pos, true /* isNull */);
+            } else {
+                structField->setNull(pos, false /* isNull */);
+                structField->copyFromRowData(pos, structValues);
+            }
+            structValues += LogicalTypeUtils::getRowLayoutSize(structField->dataType);
+        }
     }
 }
 

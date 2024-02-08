@@ -9,5 +9,6 @@ LogicalTypeID RdfVariant::getLogicalTypeID(const Value* rdfVariant) {
     auto typeVal = NestedVal::getChildVal(rdfVariant, 0);
     return static_cast<LogicalTypeID>(typeVal->getValue<uint8_t>());
 }
+
 } // namespace common
 } // namespace kuzu
