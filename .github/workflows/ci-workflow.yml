@@ -246,17 +246,23 @@ jobs:
         run: npm install --include=dev
         working-directory: tools/nodejs_api
 
-      - name: Build
+      - name: Visual Studio Generator Build
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-          make all
+          make all GEN="Visual Studio 17 2022"
 
       - name: Test
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
           make test
+
+      - name: Ninja Build
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          make all GEN="Ninja"
 
       - name: Python test
         shell: cmd
