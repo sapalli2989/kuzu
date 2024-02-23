@@ -234,6 +234,7 @@ const char* const VALIDATE_PREDICATE_FUNC_NAME = "VALIDATE_PREDICATE";
 // Table functions
 const char* const TABLE_INFO_FUNC_NAME = "TABLE_INFO";
 const char* const DB_VERSION_FUNC_NAME = "DB_VERSION";
+const char* const DB_SIZE_FUNC_NAME = "DB_SIZE";
 const char* const CURRENT_SETTING_FUNC_NAME = "CURRENT_SETTING";
 const char* const SHOW_TABLES_FUNC_NAME = "SHOW_TABLES";
 const char* const SHOW_CONNECTION_FUNC_NAME = "SHOW_CONNECTION";

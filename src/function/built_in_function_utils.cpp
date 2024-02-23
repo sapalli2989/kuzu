@@ -1019,6 +1019,8 @@ void BuiltInFunctionsUtils::registerTableFunctions(CatalogSet* catalogSet) {
     catalogSet->createEntry(std::make_unique<TableFunctionCatalogEntry>(
         DB_VERSION_FUNC_NAME, DBVersionFunction::getFunctionSet()));
     catalogSet->createEntry(std::make_unique<TableFunctionCatalogEntry>(
+        DB_SIZE_FUNC_NAME, DBSizeFunction::getFunctionSet()));
+    catalogSet->createEntry(std::make_unique<TableFunctionCatalogEntry>(
         SHOW_TABLES_FUNC_NAME, ShowTablesFunction::getFunctionSet()));
     catalogSet->createEntry(std::make_unique<TableFunctionCatalogEntry>(
         TABLE_INFO_FUNC_NAME, TableInfoFunction::getFunctionSet()));

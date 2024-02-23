@@ -74,5 +74,9 @@ struct StorageInfoFunction final : public CallFunction {
     static function_set getFunctionSet();
 };
 
+struct DBSizeFunction final : public CallFunction {
+    static function_set getFunctionSet();
+};
+
 } // namespace function
 } // namespace kuzu

@@ -1,6 +1,7 @@
 add_library(kuzu_table_call
         OBJECT
         current_setting.cpp
+        db_size.cpp
         db_version.cpp
         show_connection.cpp
         show_tables.cpp

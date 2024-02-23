@@ -193,6 +193,7 @@ public:
     }
     inline void clearEvictionQueue() { evictionQueue = std::make_unique<EvictionQueue>(); }
 
+    uint64_t getMemoryUsage() const { return usedMemory.load(); }
 private:
     bool claimAFrame(
         BMFileHandle& fileHandle, common::page_idx_t pageIdx, PageReadPolicy pageReadPolicy);
