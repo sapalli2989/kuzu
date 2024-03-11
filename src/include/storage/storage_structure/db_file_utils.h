@@ -33,8 +33,11 @@ public:
     // Note: This function updates a page "transactionally", i.e., creates the WAL version of the
     // page if it doesn't exist. For the original page to be updated, the current WRITE trx needs to
     // commit and checkpoint.
+    // If readOldPage is true, the data provided by updateOp will be the data in the original page
+    //      It should be set to true when updating part of a page, but can be set to false
+    //      when inserting new pages and when updating a whole page
     static void updatePage(BMFileHandle& fileHandle, DBFileID dbFileID,
-        common::page_idx_t originalPageIdx, bool isInsertingNewPage, BufferManager& bufferManager,
+        common::page_idx_t originalPageIdx, bool readOldPage, BufferManager& bufferManager,
         WAL& wal, const std::function<void(uint8_t*)>& updateOp);
 };
 } // namespace storage

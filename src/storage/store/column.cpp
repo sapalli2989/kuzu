@@ -571,8 +571,8 @@ void Column::updatePageWithCursor(
         DBFileUtils::insertNewPage(*dataFH, dbFileID, *bufferManager, *wal);
         insertingNewPage = true;
     }
-    DBFileUtils::updatePage(*dataFH, dbFileID, cursor.pageIdx, insertingNewPage, *bufferManager,
-        *wal, [&](auto frame) { writeOp(frame, cursor.elemPosInPage); });
+    DBFileUtils::updatePage(*dataFH, dbFileID, cursor.pageIdx, !insertingNewPage /*readOldPage=*/,
+        *bufferManager, *wal, [&](auto frame) { writeOp(frame, cursor.elemPosInPage); });
 }
 
 Column::ReadState Column::getReadState(

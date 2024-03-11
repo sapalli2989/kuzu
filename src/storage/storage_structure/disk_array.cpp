@@ -110,9 +110,8 @@ void BaseDiskArrayInternal::update(uint64_t idx, std::span<uint8_t> val) {
     // getAPPageIdxNoLock logic needs to change to give the same guarantee (e.g., an apIdx = 0, may
     // no longer to be guaranteed to be in pips[0].)
     page_idx_t apPageIdx = getAPPageIdxNoLock(apCursor.pageIdx, TransactionType::WRITE);
-    DBFileUtils::updatePage((BMFileHandle&)fileHandle, dbFileID, apPageIdx,
-        false /* not inserting a new page */, *bufferManager, *wal,
-        [&apCursor, &val](uint8_t* frame) -> void {
+    DBFileUtils::updatePage((BMFileHandle&)fileHandle, dbFileID, apPageIdx, true /*readOldPage=*/,
+        *bufferManager, *wal, [&apCursor, &val](uint8_t* frame) -> void {
             memcpy(frame + apCursor.elemPosInPage, val.data(), val.size());
         });
 }
@@ -137,7 +136,7 @@ uint64_t BaseDiskArrayInternal::resize(uint64_t newNumElements, std::span<uint8_
 uint64_t BaseDiskArrayInternal::pushBackNoLock(std::span<uint8_t> val) {
     uint64_t elementIdx;
     DBFileUtils::updatePage((BMFileHandle&)(fileHandle), dbFileID, headerPageIdx,
-        false /* not inserting a new page */, *bufferManager, *wal,
+        true /*readOldPage=*/, *bufferManager, *wal,
         [this, &val, &elementIdx](uint8_t* frame) -> void {
             auto updatedDiskArrayHeader = ((DiskArrayHeader*)frame);
             elementIdx = updatedDiskArrayHeader->numElements;
@@ -145,8 +144,9 @@ uint64_t BaseDiskArrayInternal::pushBackNoLock(std::span<uint8_t> val) {
             auto [apPageIdx, isNewlyAdded] = getAPPageIdxAndAddAPToPIPIfNecessaryForWriteTrxNoLock(
                 (DiskArrayHeader*)frame, apCursor.pageIdx);
             // Now do the push back.
-            DBFileUtils::updatePage((BMFileHandle&)(fileHandle), dbFileID, apPageIdx, isNewlyAdded,
-                *bufferManager, *wal, [&apCursor, &val](uint8_t* frame) -> void {
+            DBFileUtils::updatePage((BMFileHandle&)(fileHandle), dbFileID, apPageIdx,
+                !isNewlyAdded /*readOldPage=*/, *bufferManager, *wal,
+                [&apCursor, &val](uint8_t* frame) -> void {
                     memcpy(frame + apCursor.elemPosInPage, val.data(), val.size());
                 });
             updatedDiskArrayHeader->numElements++;
@@ -174,7 +174,7 @@ void BaseDiskArrayInternal::setNextPIPPageIDxOfPIPNoLock(DiskArrayHeader* update
          * case again this function is not creating pipPageIdxOfPreviousPIP.
          */
         DBFileUtils::updatePage((BMFileHandle&)fileHandle, dbFileID, pipPageIdxOfPreviousPIP,
-            false /* not inserting a new page */, *bufferManager, *wal,
+            true /*readOldPage=*/, *bufferManager, *wal,
             [&nextPIPPageIdx](
                 const uint8_t* frame) -> void { ((PIP*)frame)->nextPipPageIdx = nextPIPPageIdx; });
         // The above updatePage operation changes the "previousPIP" identified by
@@ -324,7 +324,7 @@ BaseDiskArrayInternal::getAPPageIdxAndAddAPToPIPIfNecessaryForWriteTrxNoLock(
         }
         // Finally we update the PIP page (possibly newly created) and add newAPPageIdx into it.
         DBFileUtils::updatePage((BMFileHandle&)fileHandle, dbFileID, pipPageIdx,
-            isInsertingANewPIPPage, *bufferManager, *wal,
+            !isInsertingANewPIPPage /*readOldPage=*/, *bufferManager, *wal,
             [&isInsertingANewPIPPage, &newAPPageIdx, &offsetOfNewAPInPIP](
                 const uint8_t* frame) -> void {
                 if (isInsertingANewPIPPage) {

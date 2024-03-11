@@ -20,8 +20,8 @@ struct WALPageIdxAndFrame {
 };
 
 WALPageIdxAndFrame createWALVersionIfNecessaryAndPinPage(page_idx_t originalPageIdx,
-    bool insertingNewPage, BMFileHandle& fileHandle, DBFileID dbFileID,
-    BufferManager& bufferManager, WAL& wal) {
+    bool readOldPage, BMFileHandle& fileHandle, DBFileID dbFileID, BufferManager& bufferManager,
+    WAL& wal) {
     fileHandle.addWALPageIdxGroupIfNecessary(originalPageIdx);
     page_idx_t pageIdxInWAL;
     uint8_t* walFrame;
@@ -35,7 +35,7 @@ WALPageIdxAndFrame createWALVersionIfNecessaryAndPinPage(page_idx_t originalPage
             wal.logPageUpdateRecord(dbFileID, originalPageIdx /* pageIdxInOriginalFile */);
         walFrame = bufferManager.pin(
             *wal.fileHandle, pageIdxInWAL, BufferManager::PageReadPolicy::DONT_READ_PAGE);
-        if (!insertingNewPage) {
+        if (readOldPage) {
             bufferManager.optimisticRead(fileHandle, originalPageIdx, [&](uint8_t* frame) -> void {
                 memcpy(walFrame, frame, BufferPoolConstants::PAGE_4KB_SIZE);
             });
@@ -87,10 +87,10 @@ common::page_idx_t DBFileUtils::insertNewPage(BMFileHandle& fileHandle, DBFileID
 }
 
 void DBFileUtils::updatePage(BMFileHandle& fileHandle, DBFileID dbFileID,
-    page_idx_t originalPageIdx, bool isInsertingNewPage, BufferManager& bufferManager, WAL& wal,
+    page_idx_t originalPageIdx, bool readOldPage, BufferManager& bufferManager, WAL& wal,
     const std::function<void(uint8_t*)>& updateOp) {
     auto walPageIdxAndFrame = createWALVersionIfNecessaryAndPinPage(
-        originalPageIdx, isInsertingNewPage, fileHandle, dbFileID, bufferManager, wal);
+        originalPageIdx, readOldPage, fileHandle, dbFileID, bufferManager, wal);
     try {
         updateOp(walPageIdxAndFrame.frame);
     } catch (Exception& e) {
