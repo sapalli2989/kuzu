@@ -26,7 +26,7 @@ public:
         uint32_t posInVectorToWriteFrom) override;
 
     void write(common::node_group_idx_t nodeGroupIdx, common::offset_t offsetInChunk,
-        ColumnChunk* data, common::offset_t dataOffset, common::length_t numValues) override;
+        const ColumnChunk* data, common::offset_t dataOffset, common::length_t numValues) override;
 
     void checkpointInMemory() override;
     void rollbackInMemory() override;

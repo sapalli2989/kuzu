@@ -46,5 +46,15 @@ void ChunkedNodeGroupCollection::merge(ChunkedNodeGroupCollection& other) {
     }
 }
 
+void ChunkedNodeGroupCollection::append(
+    const std::vector<ValueVector*>& dataVectorsToAppend, common::ValueVector& rowIdxVector) {
+    // TODO: Implement.
+}
+
+void ChunkedNodeGroupCollection::append(
+    const ColumnChunk& offsetChunk, const ChunkedNodeGroup& chunkedGroup) {
+    // TODO: Implement.
+}
+
 } // namespace storage
 } // namespace kuzu

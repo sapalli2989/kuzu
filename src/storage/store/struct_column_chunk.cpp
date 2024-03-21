@@ -34,7 +34,7 @@ void StructColumnChunk::append(
     KU_ASSERT(other->getDataType().getPhysicalType() == PhysicalTypeID::STRUCT);
     auto otherStructChunk = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(other);
     KU_ASSERT(childChunks.size() == otherStructChunk->childChunks.size());
-    nullChunk->append(other->getNullChunk(), startPosInOtherChunk, numValuesToAppend);
+    nullChunk->append(other->getNullChunkUnsafe(), startPosInOtherChunk, numValuesToAppend);
     for (auto i = 0u; i < childChunks.size(); i++) {
         childChunks[i]->append(
             otherStructChunk->childChunks[i].get(), startPosInOtherChunk, numValuesToAppend);
@@ -99,7 +99,7 @@ void StructColumnChunk::write(
     for (auto i = 0u; i < dstOffsets->getNumValues(); i++) {
         auto offsetInChunk = dstOffsets->getValue<offset_t>(i);
         KU_ASSERT(offsetInChunk < capacity);
-        nullChunk->setNull(offsetInChunk, chunk->getNullChunk()->isNull(i));
+        nullChunk->setNull(offsetInChunk, chunk->getNullChunk().isNull(i));
         numValues = offsetInChunk >= numValues ? offsetInChunk + 1 : numValues;
     }
     auto structChunk = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(chunk);
@@ -108,12 +108,13 @@ void StructColumnChunk::write(
     }
 }
 
-void StructColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
+void StructColumnChunk::write(const ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     offset_t dstOffsetInChunk, offset_t numValuesToCopy) {
     KU_ASSERT(srcChunk->getDataType().getPhysicalType() == PhysicalTypeID::STRUCT);
-    auto srcStructChunk = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(srcChunk);
+    auto srcStructChunk = ku_dynamic_cast<const ColumnChunk*, const StructColumnChunk*>(srcChunk);
     KU_ASSERT(childChunks.size() == srcStructChunk->childChunks.size());
-    nullChunk->write(srcChunk->getNullChunk(), srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
+    nullChunk->write(
+        &srcChunk->getNullChunk(), srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
         numValues = dstOffsetInChunk + numValuesToCopy;
     }
@@ -129,7 +130,7 @@ void StructColumnChunk::copy(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
         nullChunk->setNull(numValues, true);
         numValues++;
     }
-    nullChunk->append(srcChunk->getNullChunk(), srcOffsetInChunk, numValuesToCopy);
+    nullChunk->append(srcChunk->getNullChunkUnsafe(), srcOffsetInChunk, numValuesToCopy);
     auto srcStructChunk = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(srcChunk);
     for (auto i = 0u; i < childChunks.size(); i++) {
         childChunks[i]->copy(srcStructChunk->childChunks[i].get(), srcOffsetInChunk,

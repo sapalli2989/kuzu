@@ -76,7 +76,7 @@ void ChunkedNodeGroup::resetToEmpty() {
 
 void ChunkedNodeGroup::setAllNull() {
     for (auto& chunk : chunks) {
-        chunk->getNullChunk()->resetToAllNull();
+        chunk->getNullChunkUnsafe()->resetToAllNull();
     }
 }
 

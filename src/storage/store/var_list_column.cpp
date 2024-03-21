@@ -315,17 +315,17 @@ void VarListColumn::prepareCommitForChunk(Transaction* transaction, node_group_i
         std::vector<offset_t> dstOffsets;
         for (auto& [offsetInDstChunk, rowIdx] : updateInfo) {
             auto [chunkIdx, offsetInLocalChunk] =
-                LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+                ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
             auto localUpdateChunk = localUpdateChunks[chunkIdx];
             dstOffsets.push_back(offsetInDstChunk);
-            columnChunk->append(localUpdateChunk, offsetInLocalChunk, 1);
+            columnChunk->append(const_cast<ColumnChunk*>(localUpdateChunk), offsetInLocalChunk, 1);
         }
         for (auto& [offsetInDstChunk, rowIdx] : insertInfo) {
             auto [chunkIdx, offsetInLocalChunk] =
-                LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+                ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
             auto localInsertChunk = localInsertChunks[chunkIdx];
             dstOffsets.push_back(offsetInDstChunk);
-            columnChunk->append(localInsertChunk, offsetInLocalChunk, 1);
+            columnChunk->append(const_cast<ColumnChunk*>(localInsertChunk), offsetInLocalChunk, 1);
         }
         prepareCommitForChunk(transaction, nodeGroupIdx, dstOffsets, columnChunk.get(), 0);
     }
@@ -369,9 +369,9 @@ void VarListColumn::prepareCommitForChunk(Transaction* transaction, node_group_i
         Column::scan(transaction, nodeGroupIdx, offsetColumnChunk.get());
         for (auto i = 0u; i < numListsToAppend; i++) {
             auto listEndOffset = varListChunk->getListEndOffset(startSrcOffset + i);
-            auto isNull = varListChunk->getNullChunk()->isNull(startSrcOffset + i);
+            auto isNull = varListChunk->getNullChunk().isNull(startSrcOffset + i);
             offsetColumnChunk->setValue<offset_t>(dataColumnSize + listEndOffset, dstOffsets[i]);
-            offsetColumnChunk->getNullChunk()->setNull(dstOffsets[i], isNull);
+            offsetColumnChunk->getNullChunkUnsafe()->setNull(dstOffsets[i], isNull);
         }
         auto offsetListChunk =
             ku_dynamic_cast<ColumnChunk*, VarListColumnChunk*>(offsetColumnChunk.get());

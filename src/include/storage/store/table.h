@@ -7,11 +7,19 @@
 namespace kuzu {
 namespace storage {
 
+struct LocalReadState {
+    virtual ~LocalReadState() = default;
+    DELETE_COPY_DEFAULT_MOVE(LocalReadState);
+};
+
 struct TableReadState {
     const common::ValueVector& nodeIDVector;
     std::vector<common::column_id_t> columnIDs;
     const std::vector<common::ValueVector*>& outputVectors;
     std::unique_ptr<TableDataReadState> dataReadState;
+    // Following fields are used for reading from transaction local storage.
+    bool readFromLocalStorage;
+    std::unique_ptr<LocalReadState> localState;
 
     TableReadState(const common::ValueVector& nodeIDVector,
         const std::vector<common::column_id_t>& columnIDs,
@@ -23,8 +31,21 @@ struct TableReadState {
     virtual ~TableReadState() = default;
 };
 
+struct LocalWriteState {
+    explicit LocalWriteState() : rowIdxVector{*common::LogicalType::INT64()} {
+        rowIdxVector.state = std::make_unique<common::DataChunkState>();
+    }
+
+    common::ValueVector& getRowIdxVectorUnsafe() { return rowIdxVector; }
+    const common::ValueVector& getRowIdxVector() const { return rowIdxVector; }
+
+private:
+    common::ValueVector rowIdxVector;
+};
+
 struct TableInsertState {
     const std::vector<common::ValueVector*>& propertyVectors;
+    LocalWriteState localState;
 
     explicit TableInsertState(const std::vector<common::ValueVector*>& propertyVectors)
         : propertyVectors{propertyVectors} {}
@@ -34,6 +55,7 @@ struct TableInsertState {
 struct TableUpdateState {
     common::column_id_t columnID;
     const common::ValueVector& propertyVector;
+    LocalWriteState localState;
 
     TableUpdateState(common::column_id_t columnID, const common::ValueVector& propertyVector)
         : columnID{columnID}, propertyVector{propertyVector} {}
@@ -42,6 +64,8 @@ struct TableUpdateState {
 
 struct TableDeleteState {
     virtual ~TableDeleteState() = default;
+
+    LocalWriteState localState;
 };
 
 class LocalTable;
@@ -73,6 +97,9 @@ public:
     virtual void addColumn(transaction::Transaction* transaction, const catalog::Property& property,
         common::ValueVector* defaultValueVector) = 0;
     virtual void dropColumn(common::column_id_t columnID) = 0;
+
+    virtual common::column_id_t getNumColumns() const = 0;
+    virtual common::LogicalType getColumnType(common::column_id_t columnID) const = 0;
 
     virtual void prepareCommit(transaction::Transaction* transaction, LocalTable* localTable) = 0;
     virtual void prepareRollback(LocalTable* localTable) = 0;

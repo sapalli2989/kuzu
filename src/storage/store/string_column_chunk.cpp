@@ -40,7 +40,7 @@ void StringColumnChunk::append(ValueVector* vector, const SelectionVector& selVe
 void StringColumnChunk::append(
     ColumnChunk* other, offset_t startPosInOtherChunk, uint32_t numValuesToAppend) {
     auto otherChunk = ku_dynamic_cast<ColumnChunk*, StringColumnChunk*>(other);
-    nullChunk->append(otherChunk->getNullChunk(), startPosInOtherChunk, numValuesToAppend);
+    nullChunk->append(otherChunk->getNullChunkUnsafe(), startPosInOtherChunk, numValuesToAppend);
     switch (dataType.getLogicalTypeID()) {
     case LogicalTypeID::BLOB:
     case LogicalTypeID::STRING: {
@@ -89,18 +89,18 @@ void StringColumnChunk::write(
         if (!needFinalize && offsetInChunk < numValues) [[unlikely]] {
             needFinalize = true;
         }
-        nullChunk->setNull(offsetInChunk, chunk->getNullChunk()->isNull(i));
+        nullChunk->setNull(offsetInChunk, chunk->getNullChunk().isNull(i));
         if (offsetInChunk >= numValues) {
             numValues = offsetInChunk + 1;
         }
-        if (!chunk->getNullChunk()->isNull(i)) {
+        if (!chunk->getNullChunk().isNull(i)) {
             auto stringChunk = ku_dynamic_cast<ColumnChunk*, StringColumnChunk*>(chunk);
             setValueFromString(stringChunk->getValue<std::string_view>(i), offsetInChunk);
         }
     }
 }
 
-void StringColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
+void StringColumnChunk::write(const ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     offset_t dstOffsetInChunk, offset_t numValuesToCopy) {
     KU_ASSERT(srcChunk->getDataType().getPhysicalType() == PhysicalTypeID::STRING);
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
@@ -109,11 +109,12 @@ void StringColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     for (auto i = 0u; i < numValuesToCopy; i++) {
         auto srcPos = srcOffsetInChunk + i;
         auto dstPos = dstOffsetInChunk + i;
-        nullChunk->setNull(dstPos, srcChunk->getNullChunk()->isNull(srcPos));
-        if (srcChunk->getNullChunk()->isNull(srcPos)) {
+        nullChunk->setNull(dstPos, srcChunk->getNullChunk().isNull(srcPos));
+        if (srcChunk->getNullChunk().isNull(srcPos)) {
             continue;
         }
-        auto srcStringChunk = ku_dynamic_cast<ColumnChunk*, StringColumnChunk*>(srcChunk);
+        auto srcStringChunk =
+            ku_dynamic_cast<const ColumnChunk*, const StringColumnChunk*>(srcChunk);
         setValueFromString(srcStringChunk->getValue<std::string_view>(srcPos), dstPos);
     }
 }

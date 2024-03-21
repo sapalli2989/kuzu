@@ -1,7 +1,5 @@
 #pragma once
 
-#include <utility>
-
 #include "common/copy_constructors.h"
 #include "local_table.h"
 
@@ -10,62 +8,65 @@ namespace storage {
 
 class LocalNodeNG final : public LocalNodeGroup {
 public:
-    LocalNodeNG(
-        common::offset_t nodeGroupStartOffset, const std::vector<common::LogicalType>& dataTypes)
-        : LocalNodeGroup{nodeGroupStartOffset, dataTypes} {}
+    LocalNodeNG(std::shared_ptr<ChunkedNodeGroupCollection> insertChunks,
+        std::vector<std::shared_ptr<ChunkedNodeGroupCollection>> updateChunks,
+        common::offset_t nodeGroupStartOffset)
+        : LocalNodeGroup{insertChunks, updateChunks, nodeGroupStartOffset} {}
     DELETE_COPY_DEFAULT_MOVE(LocalNodeNG);
 
-    void scan(common::ValueVector* nodeIDVector, const std::vector<common::column_id_t>& columnIDs,
-        const std::vector<common::ValueVector*>& outputVectors);
-    void lookup(common::offset_t nodeOffset, common::column_id_t columnID,
-        common::ValueVector* outputVector, common::sel_t posInOutputVector);
+    void scan(TableReadState& state) override;
 
-    bool insert(std::vector<common::ValueVector*> nodeIDVectors,
-        std::vector<common::ValueVector*> propertyVectors) override;
-    bool update(std::vector<common::ValueVector*> nodeIDVectors, common::column_id_t columnID,
-        common::ValueVector* propertyVector) override;
-    bool delete_(
-        common::ValueVector* nodeIDVector, common::ValueVector* /*extraVector*/ = nullptr) override;
+    bool insert(TableInsertState& state) override;
+    bool update(TableUpdateState& state) override;
+    bool delete_(TableDeleteState& state) override;
 
-    inline const offset_to_row_idx_t& getInsertInfoRef() const {
-        return insertChunks.getOffsetToRowIdx();
+    bool hasUpdatesOrInserts() const override;
+    bool hasUpdatesOrDeletions() const override;
+
+    void prepareCommit(transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx,
+        TableData& tableData) override;
+
+    inline const offset_to_row_idx_t& getInsertInfoRef() { return insertInfo.offsetToRowIdx; }
+    inline const offset_to_row_idx_t& getUpdateInfoRef(common::column_id_t columnID) {
+        KU_ASSERT(columnID < updateInfos.size());
+        return updateInfos[columnID].offsetToRowIdx;
     }
-    inline const offset_to_row_idx_t& getUpdateInfoRef(common::column_id_t columnID) const {
-        return getUpdateChunks(columnID).getOffsetToRowIdx();
-    }
-};
-
-class LocalNodeTableData final : public LocalTableData {
-public:
-    explicit LocalNodeTableData(std::vector<common::LogicalType> dataTypes)
-        : LocalTableData{std::move(dataTypes)} {}
-
-    void scan(common::ValueVector* nodeIDVector, const std::vector<common::column_id_t>& columnIDs,
-        const std::vector<common::ValueVector*>& outputVectors);
-    void lookup(common::ValueVector* nodeIDVector,
-        const std::vector<common::column_id_t>& columnIDs,
-        const std::vector<common::ValueVector*>& outputVectors);
 
 private:
-    LocalNodeGroup* getOrCreateLocalNodeGroup(common::ValueVector* nodeIDVector) override;
+    void lookupInternal(common::offset_t nodeOffset, common::column_id_t columnID,
+        common::ValueVector& output, common::sel_t posInOutputVector);
+
+private:
+    LocalInsertUpdateInfo insertInfo;
+    LocalDeletionInfo deleteInfo;
+    std::vector<LocalInsertUpdateInfo> updateInfos;
 };
 
+// TODO(Guodong): Should move HashIndexLocalStorage here.
 class LocalNodeTable final : public LocalTable {
 public:
-    explicit LocalNodeTable(Table& table);
+    LocalNodeTable(Table& table, WAL& wal);
+
+    void initializeReadState(TableReadState&) override {
+        // DO NOTHING.
+    }
+    void scan(TableReadState& state) override;
+    void lookup(TableReadState& state) override;
 
     bool insert(TableInsertState& insertState) override;
     bool update(TableUpdateState& updateState) override;
     bool delete_(TableDeleteState& deleteState) override;
 
-    void scan(TableReadState& state) override;
-    void lookup(TableReadState& state) override;
+    void prepareCommit(transaction::Transaction* transaction) override;
+    void prepareRollback(transaction::Transaction* transaction) override;
 
-    LocalNodeTableData* getTableData() {
-        KU_ASSERT(localTableDataCollection.size() == 1);
-        return common::ku_dynamic_cast<LocalTableData*, LocalNodeTableData*>(
-            localTableDataCollection[0].get());
-    }
+private:
+    LocalNodeGroup* getLocalNodeGroup(const common::ValueVector& nodeIDVector,
+        NotExistAction action = NotExistAction::RETURN_NULL);
+    std::unique_ptr<LocalNodeGroup> createLocalNodeGroup(common::node_group_idx_t nodeGroupIdx);
+
+private:
+    std::unordered_map<common::node_group_idx_t, std::unique_ptr<LocalNodeGroup>> localNodeGroups;
 };
 
 } // namespace storage

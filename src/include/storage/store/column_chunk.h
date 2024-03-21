@@ -47,7 +47,7 @@ public:
         return ((T*)buffer.get())[pos];
     }
 
-    inline NullColumnChunk* getNullChunk() { return nullChunk.get(); }
+    inline NullColumnChunk* getNullChunkUnsafe() { return nullChunk.get(); }
     inline const NullColumnChunk& getNullChunk() const { return *nullChunk; }
     inline common::LogicalType& getDataType() { return dataType; }
     inline const common::LogicalType& getDataType() const { return dataType; }
@@ -81,7 +81,7 @@ public:
         common::offset_t offsetInChunk);
     virtual void write(
         ColumnChunk* chunk, ColumnChunk* offsetsInChunk, common::RelMultiplicity multiplicity);
-    virtual void write(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
+    virtual void write(const ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy);
     // TODO(Guodong): Used in `applyDeletionsToChunk`. Should unify with `write`.
     virtual void copy(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
@@ -141,6 +141,8 @@ protected:
     bool enableCompression;
 };
 
+using ChunkCollection = std::vector<const ColumnChunk*>;
+
 template<>
 inline void ColumnChunk::setValue(bool val, common::offset_t pos) {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
@@ -172,7 +174,7 @@ public:
         common::offset_t offsetInChunk) override;
     void write(
         ColumnChunk* chunk, ColumnChunk* dstOffsets, common::RelMultiplicity multiplicity) final;
-    void write(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
+    void write(const ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;
 };
 
@@ -213,7 +215,7 @@ public:
 
     void write(common::ValueVector* vector, common::offset_t offsetInVector,
         common::offset_t offsetInChunk) override;
-    void write(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
+    void write(const ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;
 
 protected:

@@ -105,7 +105,7 @@ public:
         common::ValueVector* vectorToWriteFrom, uint32_t posInVectorToWriteFrom);
     // Batch write to a set of sequential pages.
     virtual void write(common::node_group_idx_t nodeGroupIdx, common::offset_t offsetInChunk,
-        ColumnChunk* data, common::offset_t dataOffset, common::length_t numValues);
+        const ColumnChunk* data, common::offset_t dataOffset, common::length_t numValues);
 
     // Append values to the end of the node group, resizing it if necessary
     common::offset_t appendValues(

@@ -33,7 +33,7 @@ void StructColumn::scan(Transaction* transaction, node_group_idx_t nodeGroupIdx,
     ColumnChunk* columnChunk, offset_t startOffset, offset_t endOffset) {
     KU_ASSERT(columnChunk->getDataType().getPhysicalType() == PhysicalTypeID::STRUCT);
     nullColumn->scan(
-        transaction, nodeGroupIdx, columnChunk->getNullChunk(), startOffset, endOffset);
+        transaction, nodeGroupIdx, columnChunk->getNullChunkUnsafe(), startOffset, endOffset);
     if (nodeGroupIdx >= metadataDA->getNumElements(transaction->getType())) {
         columnChunk->setNumValues(0);
     } else {
@@ -91,11 +91,11 @@ void StructColumn::write(node_group_idx_t nodeGroupIdx, offset_t offsetInChunk,
     }
 }
 
-void StructColumn::write(node_group_idx_t nodeGroupIdx, offset_t offsetInChunk, ColumnChunk* data,
-    offset_t dataOffset, length_t numValues) {
+void StructColumn::write(node_group_idx_t nodeGroupIdx, offset_t offsetInChunk,
+    const ColumnChunk* data, offset_t dataOffset, length_t numValues) {
     KU_ASSERT(data->getDataType().getPhysicalType() == PhysicalTypeID::STRUCT);
-    nullColumn->write(nodeGroupIdx, offsetInChunk, data->getNullChunk(), dataOffset, numValues);
-    auto structData = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(data);
+    nullColumn->write(nodeGroupIdx, offsetInChunk, &data->getNullChunk(), dataOffset, numValues);
+    auto structData = ku_dynamic_cast<const ColumnChunk*, const StructColumnChunk*>(data);
     for (auto i = 0u; i < childColumns.size(); i++) {
         auto childData = structData->getChild(i);
         childColumns[i]->write(nodeGroupIdx, offsetInChunk, childData, dataOffset, numValues);
@@ -138,7 +138,7 @@ bool StructColumn::canCommitInPlace(Transaction* transaction, node_group_idx_t n
 bool StructColumn::canCommitInPlace(Transaction* transaction, node_group_idx_t nodeGroupIdx,
     const std::vector<offset_t>& dstOffsets, ColumnChunk* chunk, offset_t srcOffset) {
     return nullColumn->canCommitInPlace(
-        transaction, nodeGroupIdx, dstOffsets, chunk->getNullChunk(), srcOffset);
+        transaction, nodeGroupIdx, dstOffsets, chunk->getNullChunkUnsafe(), srcOffset);
 }
 
 void StructColumn::prepareCommitForChunk(Transaction* transaction, node_group_idx_t nodeGroupIdx,
@@ -197,10 +197,10 @@ void StructColumn::prepareCommitForChunk(Transaction* transaction, node_group_id
         // column.
         if (canCommitInPlace(transaction, nodeGroupIdx, dstOffsets, chunk, srcOffset)) {
             nullColumn->commitColumnChunkInPlace(
-                nodeGroupIdx, dstOffsets, chunk->getNullChunk(), srcOffset);
+                nodeGroupIdx, dstOffsets, chunk->getNullChunkUnsafe(), srcOffset);
         } else {
             nullColumn->commitColumnChunkOutOfPlace(transaction, nodeGroupIdx, isNewNodeGroup,
-                dstOffsets, chunk->getNullChunk(), srcOffset);
+                dstOffsets, chunk->getNullChunkUnsafe(), srcOffset);
         }
         auto chunkMeta = metadataDA->get(nodeGroupIdx, transaction->getType());
         if (nullColumn->getMetadata(nodeGroupIdx, transaction->getType()).numValues !=
@@ -223,7 +223,7 @@ ChunkCollection StructColumn::getStructChildChunkCollection(
     const ChunkCollection& chunkCollection, vector_idx_t childIdx) {
     ChunkCollection childChunkCollection;
     for (const auto& chunk : chunkCollection) {
-        auto structChunk = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(chunk);
+        auto structChunk = ku_dynamic_cast<const ColumnChunk*, const StructColumnChunk*>(chunk);
         childChunkCollection.push_back(structChunk->getChild(childIdx));
     }
     return childChunkCollection;

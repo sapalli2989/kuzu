@@ -83,10 +83,12 @@ void RelBatchInsert::mergeNodeGroup(ExecutionContext* context, const RelBatchIns
     const PartitionerSharedState& partitionerSharedState) {
     auto relTable = ku_dynamic_cast<Table*, RelTable*>(sharedState.table);
     auto nodeGroupStartOffset = StorageUtils::getStartOffsetOfNodeGroup(localState.nodeGroupIdx);
-    auto localNG = std::make_unique<LocalRelNG>(nodeGroupStartOffset, relInfo.columnTypes);
+    auto insertChunks = std::make_shared<ChunkedNodeGroupCollection>(relInfo.columnTypes);
+    std::vector<std::shared_ptr<ChunkedNodeGroupCollection>> updateChunks;
+    auto localNG = std::make_unique<LocalRelNG>(
+        insertChunks, updateChunks, relInfo.direction, nodeGroupStartOffset);
     auto& partition =
         partitionerSharedState.getPartitionBuffer(relInfo.partitioningIdx, localState.nodeGroupIdx);
-    auto& insertChunks = localNG->getInsesrtChunks();
     auto startNodeOffset = StorageUtils::getStartOffsetOfNodeGroup(localState.nodeGroupIdx);
     auto numRels = 0u;
     for (auto& chunkedGroup : partition.getChunkedGroups()) {
@@ -102,7 +104,7 @@ void RelBatchInsert::mergeNodeGroup(ExecutionContext* context, const RelBatchIns
             chunksToAppend.push_back(std::move(chunkedGroup->getColumnChunksUnsafe()[i]));
         }
         auto chunkedGroupToAppend = std::make_unique<ChunkedNodeGroup>(std::move(chunksToAppend));
-        insertChunks.appendChunkedGroup(&offsetChunk, std::move(chunkedGroupToAppend));
+        insertChunks->append(offsetChunk, *chunkedGroupToAppend);
     }
     relTable->getDirectedTableData(relInfo.direction)
         ->prepareCommitNodeGroup(

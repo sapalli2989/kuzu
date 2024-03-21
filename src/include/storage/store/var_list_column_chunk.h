@@ -54,7 +54,7 @@ public:
         common::offset_t offsetInChunk) override;
     void write(
         ColumnChunk* chunk, ColumnChunk* dstOffsets, common::RelMultiplicity multiplicity) override;
-    void write(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
+    void write(const ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;
     void copy(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;

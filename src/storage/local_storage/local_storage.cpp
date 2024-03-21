@@ -19,10 +19,12 @@ LocalTable* LocalStorage::getLocalTable(table_id_t tableID, NotExistAction actio
             auto table = clientContext.getStorageManager()->getTable(tableID);
             switch (table->getTableType()) {
             case TableType::NODE: {
-                tables[tableID] = std::make_unique<LocalNodeTable>(*table);
+                tables[tableID] = std::make_unique<LocalNodeTable>(
+                    *table, *clientContext.getStorageManager()->getWAL());
             } break;
             case TableType::REL: {
-                tables[tableID] = std::make_unique<LocalRelTable>(*table);
+                tables[tableID] = std::make_unique<LocalRelTable>(
+                    *table, *clientContext.getStorageManager()->getWAL());
             } break;
             default:
                 KU_UNREACHABLE;
@@ -39,16 +41,14 @@ LocalTable* LocalStorage::getLocalTable(table_id_t tableID, NotExistAction actio
 }
 
 void LocalStorage::prepareCommit() {
-    for (auto& [tableID, localTable] : tables) {
-        auto table = clientContext.getStorageManager()->getTable(tableID);
-        table->prepareCommit(clientContext.getTx(), localTable.get());
+    for (auto& [_, localTable] : tables) {
+        localTable->prepareCommit(clientContext.getTx());
     }
 }
 
 void LocalStorage::prepareRollback() {
-    for (auto& [tableID, localTable] : tables) {
-        auto table = clientContext.getStorageManager()->getTable(tableID);
-        table->prepareRollback(localTable.get());
+    for (auto& [_, localTable] : tables) {
+        localTable->prepareRollback(clientContext.getTx());
     }
 }
 

@@ -95,8 +95,8 @@ void NodeTable::insert(Transaction* transaction, TableInsertState& insertState) 
     if (pkIndex) {
         insertPK(nodeInsertState.nodeIDVector, nodeInsertState.pkVector);
     }
-    auto localTable = transaction->getLocalStorage()->getLocalTable(
-        tableID, LocalStorage::NotExistAction::CREATE);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     localTable->insert(insertState);
 }
 
@@ -110,8 +110,8 @@ void NodeTable::update(Transaction* transaction, TableUpdateState& updateState) 
         updatePK(transaction, updateState.columnID, nodeUpdateState.nodeIDVector,
             updateState.propertyVector);
     }
-    auto localTable = transaction->getLocalStorage()->getLocalTable(
-        tableID, LocalStorage::NotExistAction::CREATE);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     localTable->update(updateState);
 }
 
@@ -134,8 +134,8 @@ void NodeTable::delete_(Transaction* transaction, TableDeleteState& deleteState)
     auto nodeOffset = nodeDeleteState.nodeIDVector.readNodeOffset(pos);
     ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(tablesStatistics)
         ->deleteNode(tableID, nodeOffset);
-    auto localTable = transaction->getLocalStorage()->getLocalTable(
-        tableID, LocalStorage::NotExistAction::CREATE);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     localTable->delete_(deleteState);
 }
 
@@ -154,20 +154,17 @@ void NodeTable::addColumn(
     wal->addToUpdatedTables(tableID);
 }
 
-void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) {
+// TODO: Move pkIndex local storage to LocalTable.
+void NodeTable::prepareCommit(Transaction*, LocalTable*) {
     if (pkIndex) {
         pkIndex->prepareCommit();
     }
-    auto localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
-    tableData->prepareLocalTableToCommit(transaction, localNodeTable->getTableData());
-    wal->addToUpdatedTables(tableID);
 }
 
-void NodeTable::prepareRollback(LocalTable* localTable) {
+void NodeTable::prepareRollback(LocalTable*) {
     if (pkIndex) {
         pkIndex->prepareRollback();
     }
-    localTable->clear();
 }
 
 void NodeTable::checkpointInMemory() {

@@ -33,12 +33,18 @@ RelTable::RelTable(BMFileHandle* dataFH, BMFileHandle* metadataFH, RelsStoreStat
 
 void RelTable::read(Transaction* transaction, TableReadState& readState) {
     auto& relReadState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
+    if (relReadState.readFromLocalStorage) {
+        auto& localReadState =
+            ku_dynamic_cast<LocalReadState&, LocalRelReadState&>(*relReadState.localState);
+        localReadState.localNodeGroup->scan(readState);
+        return;
+    }
     scan(transaction, relReadState);
 }
 
 void RelTable::insert(Transaction* transaction, TableInsertState& insertState) {
-    auto localTable = transaction->getLocalStorage()->getLocalTable(
-        tableID, LocalStorage::NotExistAction::CREATE);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     if (localTable->insert(insertState)) {
         auto relsStats = ku_dynamic_cast<TablesStatistics*, RelsStoreStats*>(tablesStatistics);
         relsStats->updateNumTuplesByValue(tableID, 1);
@@ -46,14 +52,14 @@ void RelTable::insert(Transaction* transaction, TableInsertState& insertState) {
 }
 
 void RelTable::update(Transaction* transaction, TableUpdateState& updateState) {
-    auto localTable = transaction->getLocalStorage()->getLocalTable(
-        tableID, LocalStorage::NotExistAction::CREATE);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     localTable->update(updateState);
 }
 
 void RelTable::delete_(Transaction* transaction, TableDeleteState& deleteState) {
-    auto localTable = transaction->getLocalStorage()->getLocalTable(
-        tableID, LocalStorage::NotExistAction::CREATE);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     if (localTable->delete_(deleteState)) {
         auto relsStats = ku_dynamic_cast<TablesStatistics*, RelsStoreStats*>(tablesStatistics);
         relsStats->updateNumTuplesByValue(tableID, -1);
@@ -63,18 +69,14 @@ void RelTable::delete_(Transaction* transaction, TableDeleteState& deleteState) 
 void RelTable::detachDelete(Transaction* transaction, RelDataDirection direction,
     ValueVector* srcNodeIDVector, RelDetachDeleteState* deleteState) {
     KU_ASSERT(srcNodeIDVector->state->selVector->selectedSize == 1);
-    auto tableData =
-        direction == RelDataDirection::FWD ? fwdRelTableData.get() : bwdRelTableData.get();
-    auto reverseTableData =
-        direction == RelDataDirection::FWD ? bwdRelTableData.get() : fwdRelTableData.get();
     std::vector<column_id_t> relIDColumns = {REL_ID_COLUMN_ID};
-    auto relIDVectors = std::vector<ValueVector*>{
+    auto readOutputVectors = std::vector<ValueVector*>{
         deleteState->dstNodeIDVector.get(), deleteState->relIDVector.get()};
     auto relReadState = std::make_unique<RelTableReadState>(
-        *srcNodeIDVector, relIDColumns, relIDVectors, direction);
+        *srcNodeIDVector, relIDColumns, readOutputVectors, direction);
     initializeReadState(transaction, direction, relIDColumns, *srcNodeIDVector, *relReadState);
-    row_idx_t numRelsDeleted = detachDeleteForCSRRels(
-        transaction, tableData, reverseTableData, srcNodeIDVector, relReadState.get(), deleteState);
+    row_idx_t numRelsDeleted =
+        detachDeleteForCSRRels(transaction, srcNodeIDVector, relReadState.get(), deleteState);
     auto relsStats = ku_dynamic_cast<TablesStatistics*, RelsStoreStats*>(tablesStatistics);
     relsStats->updateNumTuplesByValue(tableID, -numRelsDeleted);
 }
@@ -94,24 +96,21 @@ void RelTable::checkIfNodeHasRels(
     }
 }
 
-// TODO(Guodong): Rework detach delete to go through local storage.
-row_idx_t RelTable::detachDeleteForCSRRels(Transaction* transaction, RelTableData* tableData,
-    RelTableData* reverseTableData, ValueVector* srcNodeIDVector,
-    RelTableReadState* relDataReadState, RelDetachDeleteState* deleteState) {
+row_idx_t RelTable::detachDeleteForCSRRels(Transaction* transaction, ValueVector* srcNodeIDVector,
+    RelTableReadState* relDataReadState, RelDetachDeleteState* detachDeleteState) {
     row_idx_t numRelsDeleted = 0;
-    auto tempState = deleteState->dstNodeIDVector->state.get();
+    auto tempState = detachDeleteState->dstNodeIDVector->state.get();
+    auto deleteState = std::make_unique<RelTableDeleteState>(
+        *srcNodeIDVector, *detachDeleteState->dstNodeIDVector, *detachDeleteState->relIDVector);
+    auto localTable =
+        transaction->getLocalStorage()->getLocalTable(tableID, NotExistAction::CREATE);
     while (relDataReadState->hasMoreToRead(transaction)) {
         scan(transaction, *relDataReadState);
         auto numRelsScanned = tempState->selVector->selectedSize;
         tempState->selVector->resetSelectorToValuePosBufferWithSize(1);
         for (auto i = 0u; i < numRelsScanned; i++) {
             tempState->selVector->selectedPositions[0] = i;
-            auto deleted =
-                tableData->delete_(transaction, srcNodeIDVector, deleteState->relIDVector.get());
-            auto reverseDeleted = reverseTableData->delete_(
-                transaction, deleteState->dstNodeIDVector.get(), deleteState->relIDVector.get());
-            KU_ASSERT(deleted == reverseDeleted);
-            numRelsDeleted += (deleted && reverseDeleted);
+            numRelsDeleted += localTable->delete_(*deleteState);
         }
         tempState->selVector->resetSelectorToUnselectedWithSize(DEFAULT_VECTOR_CAPACITY);
     }
@@ -147,18 +146,10 @@ void RelTable::addColumn(
     wal->addToUpdatedTables(tableID);
 }
 
-void RelTable::prepareCommit(Transaction* transaction, LocalTable* localTable) {
-    wal->addToUpdatedTables(tableID);
-    auto localRelTable = ku_dynamic_cast<LocalTable*, LocalRelTable*>(localTable);
-    fwdRelTableData->prepareLocalTableToCommit(
-        transaction, localRelTable->getTableData(RelDataDirection::FWD));
-    bwdRelTableData->prepareLocalTableToCommit(
-        transaction, localRelTable->getTableData(RelDataDirection::BWD));
-}
+// TODO: Should remove.
+void RelTable::prepareCommit(Transaction*, LocalTable*) {}
 
-void RelTable::prepareRollback(LocalTable* localTable) {
-    localTable->clear();
-}
+void RelTable::prepareRollback(LocalTable*) {}
 
 void RelTable::checkpointInMemory() {
     fwdRelTableData->checkpointInMemory();

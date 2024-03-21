@@ -90,10 +90,15 @@ public:
         return common::ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(
             tablesStatistics);
     }
-    inline common::column_id_t getNumColumns() const { return tableData->getNumColumns(); }
+    inline common::column_id_t getNumColumns() const override { return tableData->getNumColumns(); }
+    inline common::LogicalType getColumnType(common::column_id_t columnID) const override {
+        return tableData->getColumn(columnID)->getDataType();
+    }
     inline Column* getColumn(common::column_id_t columnID) {
         return tableData->getColumn(columnID);
     }
+
+    TableData& getTableDataUnsafe() { return *tableData; }
 
     inline void append(ChunkedNodeGroup* nodeGroup) { tableData->append(nodeGroup); }
 

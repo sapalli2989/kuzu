@@ -17,8 +17,6 @@ namespace storage {
 // thread-safe.
 class LocalStorage {
 public:
-    enum class NotExistAction { CREATE, RETURN_NULL };
-
     explicit LocalStorage(main::ClientContext& clientContext) : clientContext{clientContext} {}
     DELETE_COPY_AND_MOVE(LocalStorage);
 

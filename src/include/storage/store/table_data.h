@@ -12,7 +12,7 @@ struct TableDataReadState {
     std::vector<common::column_id_t> columnIDs;
 };
 
-class LocalTableData;
+class LocalTable;
 class TableData {
 public:
     virtual ~TableData() = default;
@@ -41,8 +41,6 @@ public:
     }
     inline const std::vector<std::unique_ptr<Column>>& getColumns() const { return columns; }
 
-    virtual void prepareLocalTableToCommit(
-        transaction::Transaction* transaction, LocalTableData* localTable) = 0;
     virtual void checkpointInMemory();
     virtual void rollbackInMemory();
 

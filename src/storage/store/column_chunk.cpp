@@ -252,11 +252,11 @@ void ColumnChunk::write(ColumnChunk* chunk, ColumnChunk* dstOffsets, RelMultipli
                                              "to the MANY-ONE/ONE-ONE relationship constraint.",
                 dstOffset));
         }
-        if (!chunk->getNullChunk()->isNull(i)) {
+        if (!chunk->getNullChunk().isNull(i)) {
             memcpy(buffer.get() + dstOffset * numBytesPerValue,
                 chunk->getData() + i * numBytesPerValue, numBytesPerValue);
         }
-        nullChunk->setNull(dstOffset, chunk->getNullChunk()->isNull(i));
+        nullChunk->setNull(dstOffset, chunk->getNullChunk().isNull(i));
         numValues = dstOffset >= numValues ? dstOffset + 1 : numValues;
     }
 }
@@ -278,8 +278,8 @@ void ColumnChunk::write(ValueVector* vector, offset_t offsetInVector, offset_t o
     }
 }
 
-void ColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk, offset_t dstOffsetInChunk,
-    offset_t numValuesToCopy) {
+void ColumnChunk::write(const ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
+    offset_t dstOffsetInChunk, offset_t numValuesToCopy) {
     KU_ASSERT(srcChunk->dataType.getPhysicalType() == dataType.getPhysicalType());
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
         numValues = dstOffsetInChunk + numValuesToCopy;
@@ -287,7 +287,8 @@ void ColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk, offset
     memcpy(buffer.get() + dstOffsetInChunk * numBytesPerValue,
         srcChunk->buffer.get() + srcOffsetInChunk * numBytesPerValue,
         numValuesToCopy * numBytesPerValue);
-    nullChunk->write(srcChunk->getNullChunk(), srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
+    nullChunk->write(
+        &srcChunk->getNullChunk(), srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
 }
 
 void ColumnChunk::copy(ColumnChunk* srcChunk, offset_t srcOffsetInChunk, offset_t dstOffsetInChunk,
@@ -438,7 +439,7 @@ void BoolColumnChunk::append(
     NullMask::copyNullMask((uint64_t*)static_cast<BoolColumnChunk*>(other)->buffer.get(),
         startPosInOtherChunk, (uint64_t*)buffer.get(), numValues, numValuesToAppend);
     if (nullChunk) {
-        nullChunk->append(other->getNullChunk(), startPosInOtherChunk, numValuesToAppend);
+        nullChunk->append(other->getNullChunkUnsafe(), startPosInOtherChunk, numValuesToAppend);
     }
     numValues += numValuesToAppend;
 }
@@ -463,7 +464,7 @@ void BoolColumnChunk::write(
         KU_ASSERT(dstOffset < capacity);
         NullMask::setNull((uint64_t*)buffer.get(), dstOffset, chunk->getValue<bool>(i));
         if (nullChunk) {
-            nullChunk->setNull(dstOffset, chunk->getNullChunk()->isNull(i));
+            nullChunk->setNull(dstOffset, chunk->getNullChunk().isNull(i));
         }
         numValues = dstOffset >= numValues ? dstOffset + 1 : numValues;
     }
@@ -479,16 +480,18 @@ void BoolColumnChunk::write(ValueVector* vector, offset_t offsetInVector, offset
     numValues = offsetInChunk >= numValues ? offsetInChunk + 1 : numValues;
 }
 
-void BoolColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
+void BoolColumnChunk::write(const ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     offset_t dstOffsetInChunk, offset_t numValuesToCopy) {
     if (nullChunk) {
         nullChunk->write(
-            srcChunk->getNullChunk(), srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
+            &srcChunk->getNullChunk(), srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
     }
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
         numValues = dstOffsetInChunk + numValuesToCopy;
     }
-    NullMask::copyNullMask((uint64_t*)static_cast<BoolColumnChunk*>(srcChunk)->buffer.get(),
+    NullMask::copyNullMask(
+        (uint64_t*)ku_dynamic_cast<const ColumnChunk*, const BoolColumnChunk*>(srcChunk)
+            ->buffer.get(),
         srcOffsetInChunk, (uint64_t*)buffer.get(), dstOffsetInChunk, numValuesToCopy);
 }
 
@@ -509,18 +512,19 @@ void NullColumnChunk::write(ValueVector* vector, offset_t offsetInVector, offset
     numValues = offsetInChunk >= numValues ? offsetInChunk + 1 : numValues;
 }
 
-void NullColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
+void NullColumnChunk::write(const ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     offset_t dstOffsetInChunk, offset_t numValuesToCopy) {
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
         numValues = dstOffsetInChunk + numValuesToCopy;
     }
-    copyFromBuffer((uint64_t*)static_cast<NullColumnChunk*>(srcChunk)->buffer.get(),
+    copyFromBuffer((uint64_t*)ku_dynamic_cast<const ColumnChunk*, const NullColumnChunk*>(srcChunk)
+                       ->buffer.get(),
         srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
 }
 
 void NullColumnChunk::append(
     ColumnChunk* other, offset_t startOffsetInOtherChunk, uint32_t numValuesToAppend) {
-    copyFromBuffer((uint64_t*)static_cast<NullColumnChunk*>(other)->buffer.get(),
+    copyFromBuffer((uint64_t*)ku_dynamic_cast<ColumnChunk*, NullColumnChunk*>(other)->buffer.get(),
         startOffsetInOtherChunk, numValues, numValuesToAppend);
     numValues += numValuesToAppend;
 }

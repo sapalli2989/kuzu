@@ -13,6 +13,10 @@ public:
     StructColumnChunk(
         common::LogicalType dataType, uint64_t capacity, bool enableCompression, bool inMemory);
 
+    inline const ColumnChunk* getChild(common::vector_idx_t childIdx) const {
+        KU_ASSERT(childIdx < childChunks.size());
+        return childChunks[childIdx].get();
+    }
     inline ColumnChunk* getChild(common::vector_idx_t childIdx) {
         KU_ASSERT(childIdx < childChunks.size());
         return childChunks[childIdx].get();
@@ -32,7 +36,7 @@ protected:
         common::offset_t offsetInChunk) override;
     void write(
         ColumnChunk* chunk, ColumnChunk* dstOffsets, common::RelMultiplicity multiplicity) override;
-    void write(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
+    void write(const ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;
     void copy(ColumnChunk* srcChunk, common::offset_t srcOffsetInChunk,
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;

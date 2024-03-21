@@ -57,15 +57,15 @@ void StringColumn::writeValue(const ColumnChunkMetadata& chunkMeta, node_group_i
     Column::writeValues(state, offsetInChunk, (uint8_t*)&index);
 }
 
-void StringColumn::write(node_group_idx_t nodeGroupIdx, offset_t dstOffset, ColumnChunk* data,
+void StringColumn::write(node_group_idx_t nodeGroupIdx, offset_t dstOffset, const ColumnChunk* data,
     offset_t srcOffset, length_t numValues) {
     auto state = getReadState(TransactionType::WRITE, nodeGroupIdx);
     numValues = std::min(numValues, data->getNumValues() - srcOffset);
-    auto strChunk = ku_dynamic_cast<ColumnChunk*, StringColumnChunk*>(data);
+    auto strChunk = ku_dynamic_cast<const ColumnChunk*, const StringColumnChunk*>(data);
     std::vector<string_index_t> indices;
     indices.resize(numValues);
     for (auto i = 0u; i < numValues; i++) {
-        if (strChunk->getNullChunk()->isNull(i + srcOffset)) {
+        if (strChunk->getNullChunk().isNull(i + srcOffset)) {
             indices[i] = 0;
             continue;
         }
@@ -176,7 +176,7 @@ bool StringColumn::canCommitInPlace(transaction::Transaction* transaction,
     auto strLenToAdd = 0u;
     for (auto& [_, rowIdx] : updateInfo) {
         auto [chunkIdx, offsetInLocalChunk] =
-            LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+            ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
         auto localUpdateChunk = localUpdateChunks[chunkIdx];
         auto kuStr = localUpdateChunk->getValue<ku_string_t>(offsetInLocalChunk);
         strLenToAdd += kuStr.len;
@@ -187,7 +187,7 @@ bool StringColumn::canCommitInPlace(transaction::Transaction* transaction,
             maxOffset = offset;
         }
         auto [chunkIdx, offsetInLocalChunk] =
-            LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+            ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
         auto localInsertChunk = localInsertChunks[chunkIdx];
         auto kuStr = localInsertChunk->getValue<ku_string_t>(offsetInLocalChunk);
         strLenToAdd += kuStr.len;
@@ -205,7 +205,7 @@ bool StringColumn::canCommitInPlace(Transaction* transaction, node_group_idx_t n
     auto strChunk = ku_dynamic_cast<ColumnChunk*, StringColumnChunk*>(chunk);
     auto length = std::min((uint64_t)dstOffsets.size(), strChunk->getNumValues());
     for (auto i = 0u; i < length; i++) {
-        if (strChunk->getNullChunk()->isNull(i)) {
+        if (strChunk->getNullChunk().isNull(i)) {
             continue;
         }
         strLenToAdd += strChunk->getStringLength(i + srcOffset);

@@ -1,7 +1,6 @@
 #include "storage/store/node_table_data.h"
 
 #include "common/cast.h"
-#include "storage/local_storage/local_node_table.h"
 #include "storage/local_storage/local_table.h"
 #include "storage/stats/nodes_store_statistics.h"
 
@@ -68,23 +67,23 @@ void NodeTableData::append(ChunkedNodeGroup* nodeGroup) {
     }
 }
 
-void NodeTableData::prepareLocalTableToCommit(
-    Transaction* transaction, LocalTableData* localTable) {
-    for (auto& [nodeGroupIdx, localNodeGroup] : localTable->nodeGroups) {
-        for (auto columnID = 0u; columnID < columns.size(); columnID++) {
-            auto column = columns[columnID].get();
-            auto localInsertChunk = localNodeGroup->getInsesrtChunks().getLocalChunk(columnID);
-            auto localUpdateChunk = localNodeGroup->getUpdateChunks(columnID).getLocalChunk(0);
-            if (localInsertChunk.empty() && localUpdateChunk.empty()) {
-                continue;
-            }
-            auto localNodeNG = ku_dynamic_cast<LocalNodeGroup*, LocalNodeNG*>(localNodeGroup.get());
-            column->prepareCommitForChunk(transaction, nodeGroupIdx, localInsertChunk,
-                localNodeNG->getInsertInfoRef(), localUpdateChunk,
-                localNodeNG->getUpdateInfoRef(columnID), {} /* deleteInfo */);
-        }
-    }
-}
+// void NodeTableData::prepareLocalTableToCommit(Transaction* transaction, LocalTable* localTable) {
+//    for (auto& [nodeGroupIdx, localNodeGroup] : localTable->nodeGroups) {
+//        for (auto columnID = 0u; columnID < columns.size(); columnID++) {
+//            auto column = columns[columnID].get();
+//            auto localInsertChunk = localNodeGroup->getInsesrtChunks().getLocalChunk(columnID);
+//            auto localUpdateChunk = localNodeGroup->getUpdateChunks(columnID).getLocalChunk(0);
+//            if (localInsertChunk.empty() && localUpdateChunk.empty()) {
+//                continue;
+//            }
+//            auto localNodeNG = ku_dynamic_cast<LocalNodeGroup*,
+//            LocalNodeNG*>(localNodeGroup.get()); column->prepareCommitForChunk(transaction,
+//            nodeGroupIdx, localInsertChunk,
+//                localNodeNG->getInsertInfoRef(), localUpdateChunk,
+//                localNodeNG->getUpdateInfoRef(columnID), {} /* deleteInfo */);
+//        }
+//    }
+//}
 
 } // namespace storage
 } // namespace kuzu

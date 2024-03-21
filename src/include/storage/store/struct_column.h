@@ -31,7 +31,7 @@ public:
     void write(common::node_group_idx_t nodeGroupIdx, common::offset_t offsetInChunk,
         common::ValueVector* vectorToWriteFrom, uint32_t posInVectorToWriteFrom) override;
     void write(common::node_group_idx_t nodeGroupIdx, common::offset_t offsetInChunk,
-        ColumnChunk* data, common::offset_t dataOffset, common::length_t numValues) override;
+        const ColumnChunk* data, common::offset_t dataOffset, common::length_t numValues) override;
 
     void prepareCommitForChunk(transaction::Transaction* transaction,
         common::node_group_idx_t nodeGroupIdx, const ChunkCollection& localInsertChunk,

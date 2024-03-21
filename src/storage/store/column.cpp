@@ -292,7 +292,7 @@ void Column::scan(Transaction* transaction, node_group_idx_t nodeGroupIdx, Colum
     offset_t startOffset, offset_t endOffset) {
     if (nullColumn) {
         nullColumn->scan(
-            transaction, nodeGroupIdx, columnChunk->getNullChunk(), startOffset, endOffset);
+            transaction, nodeGroupIdx, columnChunk->getNullChunkUnsafe(), startOffset, endOffset);
     }
     if (nodeGroupIdx >= metadataDA->getNumElements(transaction->getType())) {
         columnChunk->setNumValues(0);
@@ -485,7 +485,7 @@ void Column::append(ColumnChunk* columnChunk, uint64_t nodeGroupIdx) {
     metadataDA->update(nodeGroupIdx, metadata);
     if (nullColumn) {
         // Null column chunk.
-        nullColumn->append(columnChunk->getNullChunk(), nodeGroupIdx);
+        nullColumn->append(columnChunk->getNullChunkUnsafe(), nodeGroupIdx);
     }
 }
 
@@ -514,7 +514,7 @@ void Column::writeValue(const ColumnChunkMetadata& chunkMeta, node_group_idx_t n
         });
 }
 
-void Column::write(node_group_idx_t nodeGroupIdx, offset_t offsetInChunk, ColumnChunk* data,
+void Column::write(node_group_idx_t nodeGroupIdx, offset_t offsetInChunk, const ColumnChunk* data,
     offset_t dataOffset, length_t numValues) {
     auto state = getReadState(TransactionType::WRITE, nodeGroupIdx);
     writeValues(state, offsetInChunk, data->getData(), dataOffset, numValues);
@@ -645,13 +645,13 @@ void Column::prepareCommitForChunk(Transaction* transaction, node_group_idx_t no
                 transaction, nodeGroupIdx, isNewNodeGroup, dstOffsets, chunk, startSrcOffset);
         }
         if (nullColumn) {
-            if (nullColumn->canCommitInPlace(
-                    transaction, nodeGroupIdx, dstOffsets, chunk->getNullChunk(), startSrcOffset)) {
+            if (nullColumn->canCommitInPlace(transaction, nodeGroupIdx, dstOffsets,
+                    chunk->getNullChunkUnsafe(), startSrcOffset)) {
                 nullColumn->commitColumnChunkInPlace(
-                    nodeGroupIdx, dstOffsets, chunk->getNullChunk(), startSrcOffset);
+                    nodeGroupIdx, dstOffsets, chunk->getNullChunkUnsafe(), startSrcOffset);
             } else if (didInPlaceCommit) {
                 nullColumn->commitColumnChunkOutOfPlace(transaction, nodeGroupIdx, isNewNodeGroup,
-                    dstOffsets, chunk->getNullChunk(), startSrcOffset);
+                    dstOffsets, chunk->getNullChunkUnsafe(), startSrcOffset);
             }
         }
     }
@@ -689,8 +689,8 @@ bool Column::checkUpdateInPlace(const ColumnChunkMetadata& metadata,
     std::sort(rowIdxesToRead.begin(), rowIdxesToRead.end());
     for (auto rowIdx : rowIdxesToRead) {
         auto [chunkIdx, offsetInLocalChunk] =
-            LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
-        if (localChunks[chunkIdx]->getNullChunk()->isNull(offsetInLocalChunk)) {
+            ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+        if (localChunks[chunkIdx]->getNullChunk().isNull(offsetInLocalChunk)) {
             continue;
         }
         if (!metadata.compMeta.canUpdateInPlace(
@@ -763,10 +763,10 @@ void Column::commitLocalChunkOutOfPlace(Transaction* transaction, node_group_idx
         applyLocalChunkToColumnChunk(localUpdateChunks, columnChunk.get(), updateInfo);
         // Lastly, apply inserts from the local chunk.
         applyLocalChunkToColumnChunk(localInsertChunks, columnChunk.get(), insertInfo);
-        if (columnChunk->getNullChunk()) {
+        if (columnChunk->getNullChunkUnsafe()) {
             // Set nulls based on deleteInfo.
             for (auto offsetInChunk : deleteInfo) {
-                columnChunk->getNullChunk()->setNull(offsetInChunk, true /* isNull */);
+                columnChunk->getNullChunkUnsafe()->setNull(offsetInChunk, true /* isNull */);
             }
         }
     }
@@ -807,7 +807,7 @@ void Column::applyLocalChunkToColumnChunk(const ChunkCollection& localChunks,
     ColumnChunk* columnChunk, const offset_to_row_idx_t& updateInfo) {
     for (auto& [offsetInDstChunk, rowIdx] : updateInfo) {
         auto [chunkIdx, offsetInLocalChunk] =
-            LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+            ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
         columnChunk->write(
             localChunks[chunkIdx], offsetInLocalChunk, offsetInDstChunk, 1 /* numValues */);
     }
@@ -817,8 +817,8 @@ void Column::applyLocalChunkToColumn(node_group_idx_t nodeGroupIdx,
     const ChunkCollection& localChunks, const offset_to_row_idx_t& updateInfo) {
     for (auto& [offsetInDstChunk, rowIdx] : updateInfo) {
         auto [chunkIdx, offsetInLocalChunk] =
-            LocalChunkedGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
-        if (!localChunks[chunkIdx]->getNullChunk()->isNull(offsetInLocalChunk)) {
+            ChunkedNodeGroupCollection::getChunkIdxAndOffsetInChunk(rowIdx);
+        if (!localChunks[chunkIdx]->getNullChunk().isNull(offsetInLocalChunk)) {
             write(nodeGroupIdx, offsetInDstChunk, localChunks[chunkIdx], offsetInLocalChunk,
                 1 /*numValues*/);
         } else {
@@ -880,7 +880,7 @@ PageCursor Column::getPageCursorForOffset(
 ChunkCollection Column::getNullChunkCollection(const ChunkCollection& chunkCollection) {
     ChunkCollection nullChunkCollection;
     for (const auto& chunk : chunkCollection) {
-        nullChunkCollection.push_back(chunk->getNullChunk());
+        nullChunkCollection.push_back(&chunk->getNullChunk());
     }
     return nullChunkCollection;
 }

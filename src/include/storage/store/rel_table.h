@@ -7,6 +7,10 @@
 namespace kuzu {
 namespace storage {
 
+struct LocalRelReadState : public LocalReadState {
+    LocalRelNG* localNodeGroup;
+};
+
 struct RelTableReadState : public TableReadState {
     common::RelDataDirection direction;
 
@@ -73,19 +77,24 @@ public:
         MemoryManager* memoryManager, catalog::RelTableCatalogEntry* relTableEntry, WAL* wal,
         bool enableCompression);
 
+    // TODO: Move to cpp.
     inline void initializeReadState(transaction::Transaction* transaction,
         common::RelDataDirection direction, const std::vector<common::column_id_t>& columnIDs,
         const common::ValueVector& inNodeIDVector, RelTableReadState& readState) {
-        if (!readState.dataReadState) {
-            readState.dataReadState = std::make_unique<RelDataReadState>();
+        KU_ASSERT(readState.dataReadState);
+        direction == common::RelDataDirection::FWD ?
+            fwdRelTableData->initializeReadState(transaction, columnIDs, inNodeIDVector,
+                common::ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(
+                    *readState.dataReadState)) :
+            bwdRelTableData->initializeReadState(transaction, columnIDs, inNodeIDVector,
+                common::ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(
+                    *readState.dataReadState));
+        if (transaction->isWriteTransaction()) {
+            auto localTable = transaction->getLocalStorage()->getLocalTable(tableID);
+            if (localTable) {
+                localTable->initializeReadState(readState);
+            }
         }
-        return direction == common::RelDataDirection::FWD ?
-                   fwdRelTableData->initializeReadState(transaction, columnIDs, inNodeIDVector,
-                       common::ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(
-                           *readState.dataReadState)) :
-                   bwdRelTableData->initializeReadState(transaction, columnIDs, inNodeIDVector,
-                       common::ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(
-                           *readState.dataReadState));
     }
     void read(transaction::Transaction* transaction, TableReadState& readState) override;
 
@@ -112,9 +121,12 @@ public:
         return direction == common::RelDataDirection::FWD ? fwdRelTableData->getCSRLengthColumn() :
                                                             bwdRelTableData->getCSRLengthColumn();
     }
-    inline common::column_id_t getNumColumns() {
+    inline common::column_id_t getNumColumns() const override {
         KU_ASSERT(fwdRelTableData->getNumColumns() == bwdRelTableData->getNumColumns());
         return fwdRelTableData->getNumColumns();
+    }
+    inline common::LogicalType getColumnType(common::column_id_t columnID) const override {
+        return fwdRelTableData->getColumn(columnID)->getDataType();
     }
     inline Column* getColumn(common::column_id_t columnID, common::RelDataDirection direction) {
         return direction == common::RelDataDirection::FWD ? fwdRelTableData->getColumn(columnID) :
@@ -138,6 +150,7 @@ public:
                    bwdRelTableData->isNewNodeGroup(transaction, nodeGroupIdx);
     }
 
+    // TODO: Should remove.
     void prepareCommit(transaction::Transaction* transaction, LocalTable* localTable) override;
     void prepareRollback(LocalTable* localTable) override;
     void checkpointInMemory() override;
@@ -152,7 +165,6 @@ private:
     void scan(transaction::Transaction* transaction, RelTableReadState& scanState);
 
     common::row_idx_t detachDeleteForCSRRels(transaction::Transaction* transaction,
-        RelTableData* tableData, RelTableData* reverseTableData,
         common::ValueVector* srcNodeIDVector, RelTableReadState* relDataReadState,
         RelDetachDeleteState* deleteState);
 

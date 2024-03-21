@@ -10,6 +10,10 @@ namespace storage {
 using density_range_t = std::pair<double, double>;
 
 class LocalRelNG;
+struct LocalRelDataReadState {
+    LocalRelNG* localNodeGroup;
+};
+
 struct RelDataReadState : public TableDataReadState {
     common::RelDataDirection direction;
     common::offset_t startNodeOffset;
@@ -22,7 +26,7 @@ struct RelDataReadState : public TableDataReadState {
 
     // Following fields are used for local storage.
     bool readFromLocalStorage;
-    LocalRelNG* localNodeGroup;
+    std::unique_ptr<LocalRelDataReadState> localState;
 
     explicit RelDataReadState();
     inline bool isOutOfRange(common::offset_t nodeOffset) const {
@@ -142,10 +146,6 @@ public:
         const common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
 
-    // TODO: Should be removed. This is used by detachDelete for now.
-    bool delete_(transaction::Transaction* transaction, common::ValueVector* srcNodeIDVector,
-        common::ValueVector* relIDVector);
-
     void checkRelMultiplicityConstraint(
         transaction::Transaction* transaction, common::ValueVector* srcNodeIDVector) const;
     bool checkIfNodeHasRels(
@@ -159,12 +159,6 @@ public:
     bool isNewNodeGroup(
         transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx) const;
 
-    void prepareLocalTableToCommit(
-        transaction::Transaction* transaction, LocalTableData* localTable) override;
-
-    void prepareCommitNodeGroup(transaction::Transaction* transaction,
-        common::node_group_idx_t nodeGroupIdx, LocalRelNG* localRelNG);
-
     void checkpointInMemory() override;
     void rollbackInMemory() override;
 
@@ -172,6 +166,9 @@ public:
         transaction::Transaction* transaction) const override {
         return columns[NBR_ID_COLUMN_ID]->getNumNodeGroups(transaction);
     }
+
+    void prepareCommitNodeGroup(transaction::Transaction* transaction,
+        common::node_group_idx_t nodeGroupIdx, LocalRelNG* localRelNG);
 
 private:
     static common::offset_t getMaxNumNodesInRegion(
@@ -229,9 +226,6 @@ private:
 
     std::vector<std::pair<common::offset_t, common::offset_t>> getSlidesForDeletions(
         const PersistentState& persistentState, const LocalState& localState);
-
-    LocalRelNG* getLocalNodeGroup(
-        transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx);
 
     template<typename T1, typename T2>
     static double divideNoRoundUp(T1 v1, T2 v2) {

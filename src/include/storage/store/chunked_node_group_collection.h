@@ -10,7 +10,7 @@ public:
     static constexpr uint64_t CHUNK_CAPACITY = 2048;
 
     explicit ChunkedNodeGroupCollection(std::vector<common::LogicalType> types)
-        : types{std::move(types)} {}
+        : types{std::move(types)}, numRows{0} {}
     DELETE_COPY_DEFAULT_MOVE(ChunkedNodeGroupCollection);
 
     static std::pair<uint64_t, common::offset_t> getChunkIdxAndOffsetInChunk(
@@ -32,16 +32,29 @@ public:
 
     void append(
         const std::vector<common::ValueVector*>& vectors, const common::SelectionVector& selVector);
+    void append(const ColumnChunk& offsetChunk, const ChunkedNodeGroup& chunkedGroup);
 
     void merge(std::unique_ptr<ChunkedNodeGroup> chunkedGroup);
     void merge(ChunkedNodeGroupCollection& other);
 
     inline uint64_t getNumChunkedGroups() const { return chunkedGroups.size(); }
     inline void clear() { chunkedGroups.clear(); }
+    // `rowIdxVector` contains rowIdxes for each row appended from `dataVectorsToAppend`.
+    void append(const std::vector<common::ValueVector*>& dataVectorsToAppend,
+        common::ValueVector& rowIdxVector);
+
+    ChunkCollection getChunkCollection(common::column_id_t columnID) const {
+        ChunkCollection chunkCollection;
+        for (auto& chunkedGroup : chunkedGroups) {
+            chunkCollection.push_back(&chunkedGroup->getColumnChunk(columnID));
+        }
+        return chunkCollection;
+    }
 
 private:
     std::vector<common::LogicalType> types;
     std::vector<std::unique_ptr<ChunkedNodeGroup>> chunkedGroups;
+    common::row_idx_t numRows;
 };
 
 } // namespace storage
