@@ -85,8 +85,6 @@ void RelBatchInsert::mergeNodeGroup(ExecutionContext* context, const RelBatchIns
     auto nodeGroupStartOffset = StorageUtils::getStartOffsetOfNodeGroup(localState.nodeGroupIdx);
     auto insertChunks = std::make_shared<ChunkedNodeGroupCollection>(relInfo.columnTypes);
     std::vector<std::shared_ptr<ChunkedNodeGroupCollection>> updateChunks;
-    auto localNG = std::make_unique<LocalRelNG>(
-        insertChunks, updateChunks, relInfo.direction, nodeGroupStartOffset);
     auto& partition =
         partitionerSharedState.getPartitionBuffer(relInfo.partitioningIdx, localState.nodeGroupIdx);
     auto startNodeOffset = StorageUtils::getStartOffsetOfNodeGroup(localState.nodeGroupIdx);
@@ -97,15 +95,12 @@ void RelBatchInsert::mergeNodeGroup(ExecutionContext* context, const RelBatchIns
         setOffsetToWithinNodeGroup(offsetChunk, startNodeOffset);
         std::vector<std::unique_ptr<ColumnChunk>> chunksToAppend;
         for (auto i = 0u; i < chunkedGroup->getNumColumns(); i++) {
-            if (i == relInfo.offsetColumnID) {
-                // Skip the offset vector.
-                continue;
-            }
             chunksToAppend.push_back(std::move(chunkedGroup->getColumnChunksUnsafe()[i]));
         }
-        auto chunkedGroupToAppend = std::make_unique<ChunkedNodeGroup>(std::move(chunksToAppend));
-        insertChunks->append(offsetChunk, *chunkedGroupToAppend);
+        insertChunks->merge(std::make_unique<ChunkedNodeGroup>(std::move(chunksToAppend)));
     }
+    auto localNG =
+        std::make_unique<LocalRelNG>(insertChunks, relInfo.direction, nodeGroupStartOffset);
     relTable->getDirectedTableData(relInfo.direction)
         ->prepareCommitNodeGroup(
             context->clientContext->getTx(), localState.nodeGroupIdx, localNG.get());

@@ -148,7 +148,11 @@ LocalNodeTable::LocalNodeTable(Table& table, WAL& wal) : LocalTable{table, wal} 
 
 bool LocalNodeTable::insert(TableInsertState& state) {
     auto& insertState = ku_dynamic_cast<TableInsertState&, NodeTableInsertState&>(state);
-    insertChunks->append(insertState.propertyVectors, state.localState.getRowIdxVectorUnsafe());
+    KU_ASSERT(!insertState.propertyVectors.empty());
+    auto rowIdx = insertChunks->append(
+        insertState.propertyVectors, *insertState.propertyVectors[0]->state->selVector);
+    auto& rowIdxVector = state.localState.getRowIdxVectorUnsafe();
+    rowIdxVector.setValue<row_idx_t>(rowIdxVector.state->selVector->selectedPositions[0], rowIdx);
     return getLocalNodeGroup(insertState.nodeIDVector, NotExistAction::CREATE)->insert(state);
 }
 
@@ -157,8 +161,10 @@ bool LocalNodeTable::update(TableUpdateState& state) {
     KU_ASSERT(updateState.columnID < updateChunks.size());
     std::vector<ValueVector*> propertyVectors = {
         const_cast<ValueVector*>(&updateState.propertyVector)};
-    updateChunks[updateState.columnID]->append(
-        propertyVectors, updateState.localState.getRowIdxVectorUnsafe());
+    auto rowIdx = updateChunks[updateState.columnID]->append(
+        propertyVectors, *updateState.propertyVector.state->selVector);
+    auto& rowIdxVector = state.localState.getRowIdxVectorUnsafe();
+    rowIdxVector.setValue<row_idx_t>(rowIdxVector.state->selVector->selectedPositions[0], rowIdx);
     return getLocalNodeGroup(updateState.nodeIDVector, NotExistAction::CREATE)->update(state);
 }
 

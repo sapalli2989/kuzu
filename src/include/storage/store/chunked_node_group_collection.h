@@ -30,18 +30,14 @@ public:
         return chunkedGroups[groupIdx].get();
     }
 
-    void append(
+    common::row_idx_t append(
         const std::vector<common::ValueVector*>& vectors, const common::SelectionVector& selVector);
-    void append(const ColumnChunk& offsetChunk, const ChunkedNodeGroup& chunkedGroup);
 
     void merge(std::unique_ptr<ChunkedNodeGroup> chunkedGroup);
     void merge(ChunkedNodeGroupCollection& other);
 
     inline uint64_t getNumChunkedGroups() const { return chunkedGroups.size(); }
     inline void clear() { chunkedGroups.clear(); }
-    // `rowIdxVector` contains rowIdxes for each row appended from `dataVectorsToAppend`.
-    void append(const std::vector<common::ValueVector*>& dataVectorsToAppend,
-        common::ValueVector& rowIdxVector);
 
     ChunkCollection getChunkCollection(common::column_id_t columnID) const {
         ChunkCollection chunkCollection;

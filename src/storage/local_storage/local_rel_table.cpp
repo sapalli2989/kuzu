@@ -10,8 +10,27 @@ namespace storage {
 
 LocalRelNG::LocalRelNG(std::shared_ptr<ChunkedNodeGroupCollection> insertChunks,
     std::vector<std::shared_ptr<ChunkedNodeGroupCollection>> updateChunks,
-    common::RelDataDirection direction, offset_t nodeGroupStartOffset)
-    : LocalNodeGroup{insertChunks, updateChunks, nodeGroupStartOffset}, direction{direction} {}
+    RelDataDirection direction, offset_t nodeGroupStartOffset)
+    : LocalNodeGroup{insertChunks, updateChunks, nodeGroupStartOffset}, direction{direction} {
+    KU_ASSERT(insertChunks->getNumChunkedGroups() == 0);
+}
+
+LocalRelNG::LocalRelNG(std::shared_ptr<ChunkedNodeGroupCollection> insertChunks,
+    RelDataDirection direction, offset_t nodeGroupStartOffset)
+    : LocalNodeGroup{insertChunks, {}, nodeGroupStartOffset}, direction{direction} {
+    KU_ASSERT(insertChunks->getNumChunkedGroups() > 0);
+    for (auto& chunkedGroup : insertChunks->getChunkedGroups()) {
+        auto& boundIDChunk = chunkedGroup->getColumnChunk(LOCAL_BOUND_ID_COLUMN_ID);
+        auto& relIDChunk = chunkedGroup->getColumnChunk(LOCAL_REL_ID_COLUMN_ID);
+        KU_ASSERT(boundIDChunk.getNumValues() == relIDChunk.getNumValues());
+        for (auto i = 0u; i < boundIDChunk.getNumValues(); i++) {
+            auto boundNodeOffset = boundIDChunk.getValue<offset_t>(i);
+            auto relOffset = relIDChunk.getValue<offset_t>(i);
+            insertInfo.offsetToRowIdx[relOffset] = i;
+            insertInfo.srcNodeOffsetToRelOffsets[boundNodeOffset].push_back(relOffset);
+        }
+    }
+}
 
 void LocalRelNG::scan(TableReadState& state) {
     auto& relReadState =
@@ -219,7 +238,7 @@ void LocalRelNG::prepareCommit(transaction::Transaction* transaction,
 LocalRelTable::LocalRelTable(Table& table, WAL& wal) : LocalTable{table, wal} {
     std::vector<LogicalType> types;
     types.reserve(table.getNumColumns() + 1);
-    types.push_back(*LogicalType::INTERNAL_ID());
+    types.push_back(*LogicalType::INTERNAL_ID()); // Bound nodeID.
     for (auto i = 0u; i < table.getNumColumns(); i++) {
         types.push_back(table.getColumnType(i));
     }
@@ -252,7 +271,9 @@ bool LocalRelTable::insert(TableInsertState& state) {
             const_cast<ValueVector*>(&insertState.dstNodeIDVector)};
     insertVectors.insert(insertVectors.end(), insertState.propertyVectors.begin(),
         insertState.propertyVectors.end());
-    insertChunks->append(insertVectors, state.localState.getRowIdxVectorUnsafe());
+    auto rowIdx = insertChunks->append(insertVectors, *insertVectors[0]->state->selVector);
+    auto& rowIdxVector = state.localState.getRowIdxVectorUnsafe();
+    rowIdxVector.setValue<row_idx_t>(rowIdxVector.state->selVector->selectedPositions[0], rowIdx);
     auto fwdInsertion = getLocalNodeGroup(
         RelDataDirection::FWD, insertState.srcNodeIDVector, NotExistAction::CREATE)
                             ->insert(state);
@@ -268,8 +289,10 @@ bool LocalRelTable::update(TableUpdateState& state) {
     KU_ASSERT(updateState.columnID < updateChunks.size());
     auto updateVectors =
         std::vector<ValueVector*>{const_cast<ValueVector*>(&updateState.propertyVector)};
-    updateChunks[updateState.columnID]->append(
-        updateVectors, state.localState.getRowIdxVectorUnsafe());
+    auto rowIdx = updateChunks[updateState.columnID]->append(
+        updateVectors, *updateState.propertyVector.state->selVector);
+    auto& rowIdxVector = state.localState.getRowIdxVectorUnsafe();
+    rowIdxVector.setValue<row_idx_t>(rowIdxVector.state->selVector->selectedPositions[0], rowIdx);
     auto fwdUpdated = getLocalNodeGroup(
         RelDataDirection::FWD, updateState.srcNodeIDVector, NotExistAction::CREATE)
                           ->update(updateState);

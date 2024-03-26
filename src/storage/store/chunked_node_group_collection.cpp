@@ -5,7 +5,7 @@ using namespace kuzu::common;
 namespace kuzu {
 namespace storage {
 
-void ChunkedNodeGroupCollection::append(
+row_idx_t ChunkedNodeGroupCollection::append(
     const std::vector<ValueVector*>& vectors, const SelectionVector& selVector) {
     if (chunkedGroups.empty()) {
         chunkedGroups.push_back(
@@ -29,6 +29,8 @@ void ChunkedNodeGroupCollection::append(
         }
         numRowsAppended += numRowsToAppendInGroup;
     }
+    numRows += numRowsAppended;
+    return numRows - numRowsAppended;
 }
 
 void ChunkedNodeGroupCollection::merge(std::unique_ptr<ChunkedNodeGroup> chunkedGroup) {
@@ -36,6 +38,11 @@ void ChunkedNodeGroupCollection::merge(std::unique_ptr<ChunkedNodeGroup> chunked
     for (auto i = 0u; i < chunkedGroup->getNumColumns(); i++) {
         KU_ASSERT(chunkedGroup->getColumnChunk(i).getDataType() == types[i]);
     }
+    KU_ASSERT(chunkedGroup->getNumRows() <= CHUNK_CAPACITY);
+    if (!chunkedGroups.empty()) {
+        KU_ASSERT(chunkedGroups.back()->getNumRows() == CHUNK_CAPACITY);
+    }
+    numRows += chunkedGroup->getNumRows();
     chunkedGroups.push_back(std::move(chunkedGroup));
 }
 
@@ -44,16 +51,6 @@ void ChunkedNodeGroupCollection::merge(ChunkedNodeGroupCollection& other) {
     for (auto& chunkedGroup : other.chunkedGroups) {
         merge(std::move(chunkedGroup));
     }
-}
-
-void ChunkedNodeGroupCollection::append(
-    const std::vector<ValueVector*>& dataVectorsToAppend, common::ValueVector& rowIdxVector) {
-    // TODO: Implement.
-}
-
-void ChunkedNodeGroupCollection::append(
-    const ColumnChunk& offsetChunk, const ChunkedNodeGroup& chunkedGroup) {
-    // TODO: Implement.
 }
 
 } // namespace storage

@@ -8,15 +8,18 @@
 namespace kuzu {
 namespace storage {
 
-// TODO: This should be updated.
-static constexpr common::column_id_t LOCAL_NBR_ID_COLUMN_ID = 0;
-static constexpr common::column_id_t LOCAL_REL_ID_COLUMN_ID = 1;
+static constexpr common::column_id_t LOCAL_BOUND_ID_COLUMN_ID = 0;
+static constexpr common::column_id_t LOCAL_NBR_ID_COLUMN_ID = 1;
+static constexpr common::column_id_t LOCAL_REL_ID_COLUMN_ID = 2;
 
 struct RelDataReadState;
 class LocalRelNG final : public LocalNodeGroup {
 public:
     LocalRelNG(std::shared_ptr<ChunkedNodeGroupCollection> insertChunks,
         std::vector<std::shared_ptr<ChunkedNodeGroupCollection>> updateChunks,
+        common::RelDataDirection direction, common::offset_t nodeGroupStartOffset);
+    // Construct local rel node group with given insertChunks.
+    LocalRelNG(std::shared_ptr<ChunkedNodeGroupCollection> insertChunks,
         common::RelDataDirection direction, common::offset_t nodeGroupStartOffset);
     DELETE_COPY_DEFAULT_MOVE(LocalRelNG);
 
