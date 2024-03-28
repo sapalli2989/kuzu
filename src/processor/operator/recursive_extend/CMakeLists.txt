@@ -2,6 +2,7 @@ add_library(kuzu_processor_operator_ver_length_extend
         OBJECT
         frontier.cpp
         frontier_scanner.cpp
+        ife.cpp
         recursive_join.cpp
         path_property_probe.cpp
         scan_frontier.cpp)

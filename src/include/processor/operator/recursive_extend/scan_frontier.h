@@ -25,7 +25,7 @@ public:
 
     bool getNextTuplesInternal(kuzu::processor::ExecutionContext* context) override;
 
-    inline void setNodeID(common::nodeID_t nodeID) {
+    void setNodeID(common::nodeID_t nodeID) {
         nodeIDVector->setValue<common::nodeID_t>(0, nodeID);
         hasExecuted = false;
     }

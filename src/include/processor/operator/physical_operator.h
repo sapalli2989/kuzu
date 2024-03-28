@@ -6,6 +6,8 @@
 namespace kuzu {
 namespace processor {
 
+using operator_id_t = uint32_t;
+
 enum class PhysicalOperatorType : uint8_t {
     ALTER,
     AGGREGATE,
