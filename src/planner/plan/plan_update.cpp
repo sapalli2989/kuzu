@@ -1,3 +1,4 @@
+#include "binder/expression/variable_expression.h"
 #include "binder/query/updating_clause/bound_delete_clause.h"
 #include "binder/query/updating_clause/bound_insert_clause.h"
 #include "binder/query/updating_clause/bound_merge_clause.h"
@@ -67,6 +68,8 @@ void Planner::planMergeClause(const BoundUpdatingClause* updatingClause, Logical
     }
     planOptionalMatch(*mergeClause->getQueryGraphCollection(), predicates, plan);
     std::shared_ptr<Expression> mark;
+    std::shared_ptr<Expression> mark1 =
+        std::make_shared<VariableExpression>(*LogicalType::BOOL(), "mark1", "mark1");
     auto& createInfos = mergeClause->getInsertInfosRef();
     KU_ASSERT(!createInfos.empty());
     auto& createInfo = createInfos[0];
@@ -119,7 +122,7 @@ void Planner::planMergeClause(const BoundUpdatingClause* updatingClause, Logical
             logicalOnMatchSetRelInfos.push_back(createLogicalSetPropertyInfo(info));
         }
     }
-    auto merge = std::make_shared<LogicalMerge>(mark, std::move(logicalInsertNodeInfos),
+    auto merge = std::make_shared<LogicalMerge>(mark, mark1, std::move(logicalInsertNodeInfos),
         std::move(logicalInsertRelInfos), std::move(logicalOnCreateSetNodeInfos),
         std::move(logicalOnCreateSetRelInfos), std::move(logicalOnMatchSetNodeInfos),
         std::move(logicalOnMatchSetRelInfos), plan.getLastOperator());

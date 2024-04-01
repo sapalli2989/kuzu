@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common/enums/join_type.h"
-#include "processor/operator/aggregate/aggregate_hash_table.h"
 #include "processor/operator/sink.h"
 #include "processor/result/factorized_table.h"
 
@@ -23,9 +22,6 @@ public:
 private:
     std::mutex mtx;
     std::shared_ptr<FactorizedTable> table;
-
-    std::vector<std::unique_ptr<AggregateHashTable>> localAggregateHashTables;
-    std::unique_ptr<AggregateHashTable> globalAggregateHashTable;
 };
 
 struct ResultCollectorInfo {
@@ -77,7 +73,6 @@ private:
     std::shared_ptr<ResultCollectorSharedState> sharedState;
     std::vector<common::ValueVector*> payloadVectors;
     std::unique_ptr<FactorizedTable> localTable;
-    std::unique_ptr<AggregateHashTable> localAggregateHashTable;
 };
 
 } // namespace processor

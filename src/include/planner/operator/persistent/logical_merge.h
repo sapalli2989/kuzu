@@ -10,6 +10,7 @@ namespace planner {
 class LogicalMerge : public LogicalOperator {
 public:
     LogicalMerge(std::shared_ptr<binder::Expression> mark,
+        std::shared_ptr<binder::Expression> onCreate,
         std::vector<LogicalInsertInfo> insertNodeInfos,
         std::vector<LogicalInsertInfo> insertRelInfos,
         std::vector<std::unique_ptr<LogicalSetPropertyInfo>> onCreateSetNodeInfos,
@@ -18,8 +19,9 @@ public:
         std::vector<std::unique_ptr<LogicalSetPropertyInfo>> onMatchSetRelInfos,
         std::shared_ptr<LogicalOperator> child)
         : LogicalOperator{LogicalOperatorType::MERGE, std::move(child)}, mark{std::move(mark)},
-          insertNodeInfos{std::move(insertNodeInfos)}, insertRelInfos{std::move(insertRelInfos)},
-          onCreateSetNodeInfos{std::move(onCreateSetNodeInfos)},
+          onCreate{std::move(onCreate)}, insertNodeInfos{std::move(insertNodeInfos)},
+          insertRelInfos{std::move(insertRelInfos)}, onCreateSetNodeInfos{std::move(
+                                                         onCreateSetNodeInfos)},
           onCreateSetRelInfos(std::move(onCreateSetRelInfos)),
           onMatchSetNodeInfos{std::move(onMatchSetNodeInfos)}, onMatchSetRelInfos{
                                                                    std::move(onMatchSetRelInfos)} {}
@@ -31,7 +33,9 @@ public:
 
     f_group_pos_set getGroupsPosToFlatten();
 
-    inline std::shared_ptr<binder::Expression> getMark() const { return mark; }
+    std::shared_ptr<binder::Expression> getMark() const { return mark; }
+    std::shared_ptr<binder::Expression> getOnCreate() const { return onCreate; }
+
     inline const std::vector<LogicalInsertInfo>& getInsertNodeInfosRef() const {
         return insertNodeInfos;
     }
@@ -56,7 +60,7 @@ public:
     }
 
     inline std::unique_ptr<LogicalOperator> copy() final {
-        return std::make_unique<LogicalMerge>(mark, copyVector(insertNodeInfos),
+        return std::make_unique<LogicalMerge>(mark, onCreate, copyVector(insertNodeInfos),
             copyVector(insertRelInfos), LogicalSetPropertyInfo::copy(onCreateSetNodeInfos),
             LogicalSetPropertyInfo::copy(onCreateSetRelInfos),
             LogicalSetPropertyInfo::copy(onMatchSetNodeInfos),
@@ -65,6 +69,7 @@ public:
 
 private:
     std::shared_ptr<binder::Expression> mark;
+    std::shared_ptr<binder::Expression> onCreate;
     // Create infos
     std::vector<LogicalInsertInfo> insertNodeInfos;
     std::vector<LogicalInsertInfo> insertRelInfos;

@@ -1,5 +1,7 @@
 #include "processor/operator/result_collector.h"
 
+#include "processor/result/merge_hash_table.h"
+
 using namespace kuzu::common;
 using namespace kuzu::storage;
 
@@ -8,11 +10,22 @@ namespace processor {
 
 void ResultCollector::initLocalStateInternal(ResultSet* resultSet, ExecutionContext* context) {
     payloadVectors.reserve(info->payloadPositions.size());
+    std::vector<LogicalType> keyDataTypes;
     for (auto& pos : info->payloadPositions) {
-        payloadVectors.push_back(resultSet->getValueVector(pos).get());
+        auto vec = resultSet->getValueVector(pos);
+        payloadVectors.push_back(vec.get());
+        keyDataTypes.push_back(vec->dataType);
     }
-    localTable = std::make_unique<FactorizedTable>(
-        context->clientContext->getMemoryManager(), info->tableSchema->copy());
+    switch (info->accumulateType) {
+    case AccumulateType::OPTIONAL_: {
+        localAggregateHashTable =
+            make_unique<AggregateHashTable>(*context->clientContext->getMemoryManager(),
+                keyDataTypes, payloadDataTypes, aggregateFunctions, 0);
+    default:
+        localTable = std::make_unique<FactorizedTable>(
+            context->clientContext->getMemoryManager(), info->tableSchema->copy());
+    }
+    }
 }
 
 void ResultCollector::executeInternal(ExecutionContext* context) {

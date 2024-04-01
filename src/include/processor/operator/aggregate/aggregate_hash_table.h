@@ -86,13 +86,18 @@ public:
 
     void resize(uint64_t newSize);
 
-private:
-    void initializeFT(
+protected:
+    virtual void initializeTmpVectors();
+
+    virtual uint64_t matchFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
+        const std::vector<common::ValueVector*>& unFlatKeyVectors, uint64_t numMayMatches,
+        uint64_t numNoMatches);
+
+public:
+    virtual void initializeFT(
         const std::vector<std::unique_ptr<function::AggregateFunction>>& aggregateFunctions);
 
     void initializeHashTable(uint64_t numEntriesToAllocate);
-
-    void initializeTmpVectors();
 
     // ! This function will only be used by distinct aggregate, which assumes that all groupByKeys
     // are flat.
@@ -105,7 +110,7 @@ private:
     void initializeFTEntryWithUnFlatVec(
         common::ValueVector* unFlatVector, uint64_t numEntriesToInitialize, uint32_t colIdx);
 
-    void initializeFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
+    virtual void initializeFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
         const std::vector<common::ValueVector*>& unFlatKeyVectors,
         const std::vector<common::ValueVector*>& dependentKeyVectors,
         uint64_t numFTEntriesToInitialize);
@@ -150,10 +155,6 @@ private:
 
     uint64_t matchFlatVecWithFTColumn(common::ValueVector* vector, uint64_t numMayMatches,
         uint64_t& numNoMatches, uint32_t colIdx);
-
-    uint64_t matchFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
-        const std::vector<common::ValueVector*>& unFlatKeyVectors, uint64_t numMayMatches,
-        uint64_t numNoMatches);
 
     void fillEntryWithInitialNullAggregateState(uint8_t* entry);
 
@@ -205,7 +206,7 @@ private:
         std::unique_ptr<function::AggregateFunction>& aggregateFunction,
         common::ValueVector* aggVector, uint64_t multiplicity, uint32_t aggStateOffset);
 
-private:
+public:
     std::vector<common::LogicalType> dependentKeyDataTypes;
     std::vector<std::unique_ptr<function::AggregateFunction>> aggregateFunctions;
 
