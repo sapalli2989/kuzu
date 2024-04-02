@@ -40,6 +40,7 @@ enum class PhysicalOperatorType : uint8_t {
     LIMIT,
     LOAD_EXTENSION,
     MERGE,
+    MERGE_RESULT_COLLECTOR,
     MULTIPLICITY_REDUCER,
     PARTITIONER,
     PATH_PROPERTY_PROBE,

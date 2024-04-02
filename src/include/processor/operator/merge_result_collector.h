@@ -13,8 +13,8 @@ public:
         : table{std::move(table)} {}
 
     inline void mergeLocalTable(FactorizedTable& localTable) {
-        std::unique_lock lck{mtx};
-        table->merge(localTable);
+        std::unique_lock lck(mtx);
+        hashTable->merge(localHashTable);
     }
 
     inline std::shared_ptr<FactorizedTable> getTable() { return table; }

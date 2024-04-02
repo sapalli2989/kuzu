@@ -1,4 +1,5 @@
 #include "planner/operator/persistent/logical_merge.h"
+#include "processor/operator/merge_build.h"
 #include "processor/operator/persistent/merge.h"
 #include "processor/plan_mapper.h"
 
@@ -37,6 +38,7 @@ std::unique_ptr<PhysicalOperator> PlanMapper::mapMerge(planner::LogicalOperator*
     for (auto& info : logicalMerge->getOnMatchSetRelInfosRef()) {
         onMatchRelSetExecutors.push_back(getRelSetExecutor(info.get(), *inSchema));
     }
+    auto mergeBuild = std::make_shared<MergeBuild>()
     return std::make_unique<Merge>(markPos, std::move(nodeInsertExecutors),
         std::move(relInsertExecutors), std::move(onCreateNodeSetExecutors),
         std::move(onCreateRelSetExecutors), std::move(onMatchNodeSetExecutors),

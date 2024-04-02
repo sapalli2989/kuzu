@@ -26,7 +26,10 @@ static expression_vector getCorrelatedExpressions(const QueryGraphCollection& co
 }
 
 void Planner::planOptionalMatch(const QueryGraphCollection& queryGraphCollection,
-    const expression_vector& predicates, LogicalPlan& leftPlan) {
+    const expression_vector& predicates, LogicalPlan& leftPlan, bool isMerge) {
+    if (isMerge) {
+
+    }
     if (leftPlan.isEmpty()) {
         // Optional match is the first clause. No left plan to join.
         auto plan = planQueryGraphCollection(queryGraphCollection, predicates);

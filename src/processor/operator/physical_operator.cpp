@@ -71,6 +71,8 @@ std::string PhysicalOperatorUtils::operatorTypeToString(PhysicalOperatorType ope
         return "MERGE";
     case PhysicalOperatorType::MULTIPLICITY_REDUCER:
         return "MULTIPLICITY_REDUCER";
+    case PhysicalOperatorType::MERGE_RESULT_COLLECTOR:
+        return "MERGE_RESULT_COLLECTOR";
     case PhysicalOperatorType::PARTITIONER:
         return "PARTITIONER";
     case PhysicalOperatorType::PATH_PROPERTY_PROBE:

@@ -18,54 +18,70 @@ void ResultCollector::initLocalStateInternal(ResultSet* resultSet, ExecutionCont
     }
     switch (info->accumulateType) {
     case AccumulateType::OPTIONAL_: {
+        std::vector<std::unique_ptr<function::AggregateFunction>> aggregateFunctions;
         localAggregateHashTable =
             make_unique<AggregateHashTable>(*context->clientContext->getMemoryManager(),
-                keyDataTypes, payloadDataTypes, aggregateFunctions, 0);
+                keyDataTypes, std::vector<LogicalType>{}, aggregateFunctions, 0);
+    }
     default:
         localTable = std::make_unique<FactorizedTable>(
             context->clientContext->getMemoryManager(), info->tableSchema->copy());
     }
-    }
 }
 
 void ResultCollector::executeInternal(ExecutionContext* context) {
-    while (children[0]->getNextTuple(context)) {
-        if (!payloadVectors.empty()) {
-            for (auto i = 0u; i < resultSet->multiplicity; i++) {
-                localTable->append(payloadVectors);
-            }
-        }
-    }
-    if (!payloadVectors.empty()) {
-        sharedState->mergeLocalTable(*localTable);
-    }
-}
-
-void ResultCollector::finalize(ExecutionContext* /*context*/) {
     switch (info->accumulateType) {
     case AccumulateType::OPTIONAL_: {
-        // We should remove currIdx completely as some of the code still relies on currIdx = -1 to
-        // check if the state if unFlat or not. This should no longer be necessary.
-        // TODO(Ziyi): add an interface in factorized table
-        auto table = sharedState->getTable();
-        auto tableSchema = table->getTableSchema();
-        for (auto i = 0u; i < tableSchema->getNumColumns(); ++i) {
-            auto columnSchema = tableSchema->getColumn(i);
-            if (columnSchema->isFlat()) {
-                payloadVectors[i]->state->setToFlat();
+        while (children[0]->getNextTuple(context)) {
+            if (!payloadVectors.empty()) {
+                for (auto i = 0u; i < resultSet->multiplicity; i++) {
+                    localTable->append(payloadVectors);
+                }
             }
         }
-        if (table->isEmpty()) {
-            for (auto& vector : payloadVectors) {
-                vector->setAsSingleNullEntry();
+        if (!payloadVectors.empty()) {
+            sharedState->mergeLocalTable(*localTable);
+        }
+    } break;
+    default: {
+        while (children[0]->getNextTuple(context)) {
+            if (!payloadVectors.empty()) {
+                for (auto i = 0u; i < resultSet->multiplicity; i++) {
+                    localTable->append(payloadVectors);
+                }
             }
-            table->append(payloadVectors);
+        }
+        if (!payloadVectors.empty()) {
+            sharedState->mergeLocalTable(*localTable);
         }
     }
-    default:
-        break;
     }
-}
+
+    void ResultCollector::finalize(ExecutionContext * /*context*/) {
+        switch (info->accumulateType) {
+        case AccumulateType::OPTIONAL_: {
+            // We should remove currIdx completely as some of the code still relies on currIdx = -1
+            // to check if the state if unFlat or not. This should no longer be necessary.
+            // TODO(Ziyi): add an interface in factorized table
+            auto table = sharedState->getTable();
+            auto tableSchema = table->getTableSchema();
+            for (auto i = 0u; i < tableSchema->getNumColumns(); ++i) {
+                auto columnSchema = tableSchema->getColumn(i);
+                if (columnSchema->isFlat()) {
+                    payloadVectors[i]->state->setToFlat();
+                }
+            }
+            if (table->isEmpty()) {
+                for (auto& vector : payloadVectors) {
+                    vector->setAsSingleNullEntry();
+                }
+                table->append(payloadVectors);
+            }
+        }
+        default:
+            break;
+        }
+    }
 
 } // namespace processor
 } // namespace kuzu
