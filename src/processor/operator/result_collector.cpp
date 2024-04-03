@@ -19,6 +19,7 @@ void ResultCollector::executeInternal(ExecutionContext* context) {
     while (children[0]->getNextTuple(context)) {
         if (!payloadVectors.empty()) {
             for (auto i = 0u; i < resultSet->multiplicity; i++) {
+                auto payloadVector1 = payloadVectors[0];
                 localTable->append(payloadVectors);
             }
         }

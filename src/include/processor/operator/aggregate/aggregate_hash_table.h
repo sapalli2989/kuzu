@@ -14,6 +14,8 @@ struct HashSlot {
                          // groupKeyN, aggregateState1, ..., aggregateStateN, hashValue].
 };
 
+enum class HashTableType : uint8_t { AGGREGATE_HASH_TABLE = 0, MERGE_HASH_TABLE = 1 };
+
 /**
  * AggregateHashTable Design
  *
@@ -42,15 +44,15 @@ public:
     AggregateHashTable(storage::MemoryManager& memoryManager,
         const common::logical_type_vec_t& keysDataTypes,
         const std::vector<std::unique_ptr<function::AggregateFunction>>& aggregateFunctions,
-        uint64_t numEntriesToAllocate)
+        uint64_t numEntriesToAllocate, std::unique_ptr<FactorizedTableSchema> tableSchema)
         : AggregateHashTable(memoryManager, keysDataTypes, std::vector<common::LogicalType>(),
-              aggregateFunctions, numEntriesToAllocate) {}
+              aggregateFunctions, numEntriesToAllocate, std::move(tableSchema)) {}
 
     AggregateHashTable(storage::MemoryManager& memoryManager,
         std::vector<common::LogicalType> keysDataTypes,
         std::vector<common::LogicalType> payloadsDataTypes,
         const std::vector<std::unique_ptr<function::AggregateFunction>>& aggregateFunctions,
-        uint64_t numEntriesToAllocate);
+        uint64_t numEntriesToAllocate, std::unique_ptr<FactorizedTableSchema> tableSchema);
 
     uint8_t* getEntry(uint64_t idx) { return factorizedTable->getTuple(idx); }
 
@@ -86,9 +88,10 @@ public:
 
     void resize(uint64_t newSize);
 
-private:
+protected:
     void initializeFT(
-        const std::vector<std::unique_ptr<function::AggregateFunction>>& aggregateFunctions);
+        const std::vector<std::unique_ptr<function::AggregateFunction>>& aggregateFunctions,
+        std::unique_ptr<FactorizedTableSchema> tableSchema);
 
     void initializeHashTable(uint64_t numEntriesToAllocate);
 
@@ -105,7 +108,7 @@ private:
     void initializeFTEntryWithUnFlatVec(
         common::ValueVector* unFlatVector, uint64_t numEntriesToInitialize, uint32_t colIdx);
 
-    void initializeFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
+    virtual void initializeFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
         const std::vector<common::ValueVector*>& unFlatKeyVectors,
         const std::vector<common::ValueVector*>& dependentKeyVectors,
         uint64_t numFTEntriesToInitialize);
@@ -151,7 +154,7 @@ private:
     uint64_t matchFlatVecWithFTColumn(common::ValueVector* vector, uint64_t numMayMatches,
         uint64_t& numNoMatches, uint32_t colIdx);
 
-    uint64_t matchFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
+    virtual uint64_t matchFTEntries(const std::vector<common::ValueVector*>& flatKeyVectors,
         const std::vector<common::ValueVector*>& unFlatKeyVectors, uint64_t numMayMatches,
         uint64_t numNoMatches);
 
@@ -205,7 +208,7 @@ private:
         std::unique_ptr<function::AggregateFunction>& aggregateFunction,
         common::ValueVector* aggVector, uint64_t multiplicity, uint32_t aggStateOffset);
 
-private:
+protected:
     std::vector<common::LogicalType> dependentKeyDataTypes;
     std::vector<std::unique_ptr<function::AggregateFunction>> aggregateFunctions;
 
