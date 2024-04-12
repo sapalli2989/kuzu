@@ -275,10 +275,6 @@ void RelTableData::initializeReadState(Transaction* transaction, std::vector<col
     readState.currentNodeOffset = nodeOffset;
 }
 
-void RelTableData::initializeBatchReadState(RelDataReadState& readState) {
-    readState.batchRelState.lastPosInCSR=0;
-}
-
 void RelTableData::scan(Transaction* transaction, TableDataReadState& readState,
     const ValueVector& inNodeIDVector, const std::vector<ValueVector*>& outputVectors) {
     auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(readState);
@@ -334,17 +330,14 @@ void RelTableData::updateResultPos(Transaction* transaction, TableDataReadState&
         relReadState.posInCurrentCSR += numValuesRead;
         return;
     }
-//    relReadState.getStartAndEndOffset();
+    //replace startOffset, calculate offset in batch vector
     auto [startOffset, endOffset] = relReadState.getUpdateStartAndEndOffset();//getUpdateStartAndEndOffset();//relReadState.getUpdateStartAndEndOffset();
     auto numRowsToRead = endOffset - startOffset;
     auto relIDVectorIdx = INVALID_VECTOR_IDX;
-    //update result pos
-    //TODO(Jiamin): replace startoffset, calculate offset in outputvector
     outputVectors[0]->state->selVector->setToFiltered(numRowsToRead);
     for(auto i=0u;i<numRowsToRead;i++){
         outputVectors[0]->state->selVector->selectedPositions[i]=(startOffset+i)%DEFAULT_VECTOR_CAPACITY;
      }
-//    std::cout<<"read state:"<<relReadState.currentNodeOffset<<" "<<relReadState.batchRelState.currentNodeOffset<<"\n";
     std::cout<<"update pos:"<<startOffset<<" "<<endOffset<<"\n";
     //TODO(Jiamin): do not consider in memory scan now
     if (transaction->isWriteTransaction() && relReadState.localNodeGroup) {
@@ -361,7 +354,7 @@ void RelTableData::updateResultPos(Transaction* transaction, TableDataReadState&
 void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readState,
                         const ValueVector& inNodeIDVector, const std::vector<ValueVector*>& outputVectors) {
     auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(readState);
-    //重新生成batch了，所以读的状态要重新设置
+    // since we cache a new batched vector, we need to reset the read state of nextSliceCSROffset
     relReadState.batchRelState.nextSliceCSROffset=0;
     //TODO(Jiamin): do not consider in memory scan now
     if (relReadState.readFromLocalStorage) {
@@ -375,7 +368,7 @@ void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readS
     }
     auto [startOffset, endOffset] = relReadState.getBatchStartAndEndOffset();
     auto numRowsToRead = endOffset - startOffset;
-    outputVectors[0]->state->selVector->setToFiltered(numRowsToRead);
+    outputVectors[0]->state->selVector->setToUnfiltered(numRowsToRead);
     outputVectors[0]->state->setOriginalSize(numRowsToRead);
     auto nodeGroupIdx = StorageUtils::getNodeGroupIdx(relReadState.currentNodeOffset);
     auto relIDVectorIdx = INVALID_VECTOR_IDX;

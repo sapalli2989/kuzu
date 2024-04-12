@@ -11,9 +11,9 @@ using density_range_t = std::pair<double, double>;
 
 class LocalRelNG;
 struct BatchRelDataReadState {
-    common::offset_t lastPosInCSR;// record the last CSR offset position in the batch
-    common::offset_t maxCSRNodeOffset; //record the max csr node offset in the batch
-    common::offset_t nextSliceCSROffset;//record the max node offset in the batch
+    common::offset_t lastPosInCSR;// record the last CSR offset position in the batch, use for caching a piece of csr list
+    common::offset_t maxCSRNodeOffset; // record the max csr node offset in the batch
+    common::offset_t nextSliceCSROffset;//record the slice csr offset of read state in the batch
     explicit BatchRelDataReadState() : lastPosInCSR(0), maxCSRNodeOffset{0}, nextSliceCSROffset{0} {}
 };
 struct RelDataReadState : public TableDataReadState {
@@ -23,7 +23,6 @@ struct RelDataReadState : public TableDataReadState {
     common::offset_t currentNodeOffset;
     common::offset_t posInCurrentCSR;
     std::vector<common::list_entry_t> csrListEntries;
-    //for batch rel scan
     BatchRelDataReadState batchRelState;
     // Temp auxiliary data structure to scan the offset of each CSR node in the offset column chunk.
     ChunkedCSRHeader csrHeaderChunks = ChunkedCSRHeader(false /*enableCompression*/);
@@ -43,7 +42,6 @@ struct RelDataReadState : public TableDataReadState {
     std::pair<common::offset_t, common::offset_t> getBatchStartAndEndOffset();
 
     inline bool hasMoreToReadInPersistentStorage() {
-        //TODO(Jimain): if pos in current csr
         return posInCurrentCSR < csrListEntries[(currentNodeOffset - startNodeOffset)].size;
     }
 
