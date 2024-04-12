@@ -11,10 +11,10 @@ using density_range_t = std::pair<double, double>;
 
 class LocalRelNG;
 struct BatchRelDataReadState {
-    common::offset_t lastPosInCSR;// record the last CSR offset position in the csr node
-    bool needReScan; // indicate whether we need to rescan/cache the batch
+    common::offset_t lastPosInCSR;// record the last CSR offset position in the batch
     common::offset_t maxCSRNodeOffset; //record the max csr node offset in the batch
-    explicit BatchRelDataReadState() : lastPosInCSR(0), needReScan{true},  maxCSRNodeOffset{0} {}
+    common::offset_t currentSliceCSRNodeOffset;//record the max node offset in the batch
+    explicit BatchRelDataReadState() : lastPosInCSR(0), maxCSRNodeOffset{0}, currentSliceCSRNodeOffset{0} {}
 };
 struct RelDataReadState : public TableDataReadState {
     common::RelDataDirection direction;
@@ -24,7 +24,7 @@ struct RelDataReadState : public TableDataReadState {
     common::offset_t posInCurrentCSR;
     std::vector<common::list_entry_t> csrListEntries;
     //for batch rel scan
-    std::unique_ptr<BatchRelDataReadState> batchRelState;
+    BatchRelDataReadState batchRelState;
     // Temp auxiliary data structure to scan the offset of each CSR node in the offset column chunk.
     ChunkedCSRHeader csrHeaderChunks = ChunkedCSRHeader(false /*enableCompression*/);
 
@@ -39,6 +39,7 @@ struct RelDataReadState : public TableDataReadState {
     bool hasMoreToRead(transaction::Transaction* transaction);
     void populateCSRListEntries();
     std::pair<common::offset_t, common::offset_t> getStartAndEndOffset();
+    std::pair<common::offset_t, common::offset_t> getUpdateStartAndEndOffset();
     std::pair<common::offset_t, common::offset_t> getBatchStartAndEndOffset();
 
     inline bool hasMoreToReadInPersistentStorage() {
@@ -153,6 +154,7 @@ public:
         const common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
 
+    void initializeBatchReadState(RelDataReadState& readState);
     void scanBatch(transaction::Transaction* transaction, TableDataReadState& readState,
               const common::ValueVector& inNodeIDVector,
               const std::vector<common::ValueVector*>& outputVectors);

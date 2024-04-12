@@ -88,11 +88,24 @@ public:
                            *readState.dataReadState));
     }
 
+    inline void initializeBatchReadState(common::RelDataDirection direction, RelTableReadState& readState) {
+        if (!readState.dataReadState) {
+            readState.dataReadState = std::make_unique<RelDataReadState>();
+        }
+        return direction == common::RelDataDirection::FWD ?
+               fwdRelTableData->initializeBatchReadState(common::ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(
+                                                            *readState.dataReadState)) :
+               bwdRelTableData->initializeBatchReadState(common::ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(
+                                                            *readState.dataReadState));
+    }
+
     void read(transaction::Transaction* transaction, TableReadState& readState) override;
 
     void readBatch(transaction::Transaction* transaction, TableReadState& readState);
     void updateResultPos(transaction::Transaction* transaction, TableReadState& readState);
     bool needRescan(TableReadState& readState);
+    bool overFlowRescan(TableReadState& readState);
+    bool hasMoreToReadInBatch(TableReadState& readState) const;
 
     void insert(transaction::Transaction* transaction, TableInsertState& insertState) override;
     void update(transaction::Transaction* transaction, TableUpdateState& updateState) override;

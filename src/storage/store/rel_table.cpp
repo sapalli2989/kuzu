@@ -47,7 +47,22 @@ bool RelTable::needRescan(TableReadState& readState){
     auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
     auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(*scanState.dataReadState);
     auto currentCSRInfo=relReadState.csrListEntries[relReadState.currentNodeOffset-relReadState.startNodeOffset];
-    return relReadState.batchRelState->maxCSRNodeOffset<currentCSRInfo.offset || relReadState.batchRelState->maxCSRNodeOffset==0;
+    return relReadState.batchRelState.maxCSRNodeOffset<currentCSRInfo.offset || relReadState.batchRelState.maxCSRNodeOffset==0;
+}
+
+bool RelTable::hasMoreToReadInBatch(TableReadState& readState) const {
+    auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
+    auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(*scanState.dataReadState);
+    auto currentCSRInfo=relReadState.csrListEntries[relReadState.currentNodeOffset-relReadState.startNodeOffset];
+    return relReadState.batchRelState.maxCSRNodeOffset!=0&&relReadState.batchRelState.maxCSRNodeOffset>=currentCSRInfo.offset;
+}
+
+bool RelTable::overFlowRescan(TableReadState& readState){
+    auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
+    auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(*scanState.dataReadState);
+    //处在中间的位置，表明CSR有一部分csr没有被batch vector cache住，我们需要重新读取
+    return relReadState.posInCurrentCSR>0 && relReadState.posInCurrentCSR<relReadState.csrListEntries[(relReadState.currentNodeOffset - relReadState.startNodeOffset)].size;
+//    return relReadState.batchRelState.lastPosInCSR>0 && relReadState.batchRelState.lastPosInCSR<relReadState.csrListEntries[(relReadState.currentNodeOffset - relReadState.startNodeOffset)].size;
 }
 
 void RelTable::updateResultPos(transaction::Transaction* transaction, TableReadState& readState){
