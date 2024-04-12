@@ -9,7 +9,9 @@ namespace common {
 extern const char* KUZU_VERSION;
 
 constexpr uint64_t DEFAULT_VECTOR_CAPACITY_LOG_2 = 11;
-constexpr uint64_t DEFAULT_VECTOR_CAPACITY = (uint64_t)1 << DEFAULT_VECTOR_CAPACITY_LOG_2;
+//TODO(JIMAIN): only for testing now
+constexpr uint64_t DEFAULT_VECTOR_CAPACITY = (uint64_t)2;
+//(uint64_t)1 << DEFAULT_VECTOR_CAPACITY_LOG_2;
 
 constexpr double DEFAULT_HT_LOAD_FACTOR = 1.5;
 constexpr uint32_t DEFAULT_VAR_LENGTH_EXTEND_MAX_DEPTH = 30;

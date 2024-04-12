@@ -36,6 +36,29 @@ void RelTable::read(Transaction* transaction, TableReadState& readState) {
     scan(transaction, relReadState);
 }
 
+void RelTable::readBatch(transaction::Transaction* transaction, TableReadState& readState){
+    auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
+    auto tableData = getDirectedTableData(scanState.direction);
+    tableData->scanBatch(transaction, *scanState.dataReadState, scanState.nodeIDVector,
+                    scanState.outputVectors);
+}
+
+bool RelTable::needRescan(TableReadState& readState){
+    auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
+    auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(*scanState.dataReadState);
+//    if(relReadState.currentNodeOffset>relReadState.batchRelState->currentNodeOffset)
+//    std::cout << "relReadState.currentNodeOffset: " << relReadState.currentNodeOffset << " "<<relReadState.batchRelState->currentNodeOffset<<std::endl;
+    auto currentCSRInfo=relReadState.csrListEntries[relReadState.currentNodeOffset-relReadState.startNodeOffset];
+    return relReadState.batchRelState->maxCSRNodeOffset<currentCSRInfo.offset || relReadState.batchRelState->maxCSRNodeOffset==0;
+}
+
+void RelTable::updateResultPos(transaction::Transaction* transaction, TableReadState& readState){
+    auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
+    auto tableData = getDirectedTableData(scanState.direction);
+    tableData->updateResultPos(transaction, *scanState.dataReadState, scanState.nodeIDVector,
+                         scanState.outputVectors);
+}
+
 void RelTable::insert(Transaction* transaction, TableInsertState& insertState) {
     auto localTable = transaction->getLocalStorage()->getLocalTable(tableID,
         LocalStorage::NotExistAction::CREATE);

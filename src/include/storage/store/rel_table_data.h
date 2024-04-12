@@ -10,6 +10,18 @@ namespace storage {
 using density_range_t = std::pair<double, double>;
 
 class LocalRelNG;
+struct BatchRelDataReadState {
+    common::offset_t startNodeOffset;
+    common::offset_t numNodes;
+    common::offset_t numNodeRead;
+    common::offset_t currentNodeOffset;
+    common::offset_t posInCurrentCSR;
+    bool needReScan;
+    common::offset_t maxCSRNodeOffset;
+//    explicit BatchRelDataReadState() : needReScan{false} {}
+    explicit BatchRelDataReadState() : startNodeOffset(0), numNodes(0), numNodeRead(0),
+        currentNodeOffset(0), posInCurrentCSR(0), needReScan{true},  maxCSRNodeOffset{0} {}
+};
 struct RelDataReadState : public TableDataReadState {
     common::RelDataDirection direction;
     common::offset_t startNodeOffset;
@@ -17,6 +29,8 @@ struct RelDataReadState : public TableDataReadState {
     common::offset_t currentNodeOffset;
     common::offset_t posInCurrentCSR;
     std::vector<common::list_entry_t> csrListEntries;
+    //for batch rel scan
+    std::unique_ptr<BatchRelDataReadState> batchRelState;
     // Temp auxiliary data structure to scan the offset of each CSR node in the offset column chunk.
     ChunkedCSRHeader csrHeaderChunks = ChunkedCSRHeader(false /*enableCompression*/);
 
@@ -31,10 +45,13 @@ struct RelDataReadState : public TableDataReadState {
     bool hasMoreToRead(transaction::Transaction* transaction);
     void populateCSRListEntries();
     std::pair<common::offset_t, common::offset_t> getStartAndEndOffset();
+    std::pair<common::offset_t, common::offset_t> getBatchStartAndEndOffset();
 
     inline bool hasMoreToReadInPersistentStorage() {
+        //TODO(Jimain): if pos in current csr
         return posInCurrentCSR < csrListEntries[(currentNodeOffset - startNodeOffset)].size;
     }
+
     bool hasMoreToReadFromLocalStorage() const;
     bool trySwitchToLocalStorage();
 };
@@ -135,12 +152,20 @@ public:
     void initializeReadState(transaction::Transaction* transaction,
         std::vector<common::column_id_t> columnIDs, const common::ValueVector& inNodeIDVector,
         RelDataReadState& readState);
+    void initializeBatchReadState(RelDataReadState& readState);
     void scan(transaction::Transaction* transaction, TableDataReadState& readState,
         const common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
     void lookup(transaction::Transaction* transaction, TableDataReadState& readState,
         const common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
+
+    void scanBatch(transaction::Transaction* transaction, TableDataReadState& readState,
+              const common::ValueVector& inNodeIDVector,
+              const std::vector<common::ValueVector*>& outputVectors);
+    void updateResultPos(transaction::Transaction* transaction, TableDataReadState& readState,
+                         const common::ValueVector& inNodeIDVector,
+                         const std::vector<common::ValueVector*>& outputVectors);
 
     // TODO: Should be removed. This is used by detachDelete for now.
     bool delete_(transaction::Transaction* transaction, common::ValueVector* srcNodeIDVector,

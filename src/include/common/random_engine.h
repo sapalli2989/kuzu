@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pcg_random.hpp"
+#include "common/mutex.h"
 
 namespace kuzu {
 
@@ -20,9 +21,9 @@ class RandomEngine {
 public:
     RandomEngine();
     uint32_t nextRandomInteger();
-
 private:
     RandomState randomState;
+    std::mutex lock;
 };
 } // namespace common
 } // namespace kuzu
