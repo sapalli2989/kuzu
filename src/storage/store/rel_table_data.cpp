@@ -76,9 +76,11 @@ std::pair<offset_t, offset_t> RelDataReadState::getStartAndEndOffset() {
 std::pair<offset_t, offset_t> RelDataReadState::getUpdateStartAndEndOffset() {
     auto currCSRListEntry = csrListEntries[currentNodeOffset - startNodeOffset];
     auto currCSRSize = currCSRListEntry.size;
-    auto startOffset = currCSRListEntry.offset + batchRelState.currentSliceCSRNodeOffset;
-    auto numRowsToRead = std::min(currCSRSize - batchRelState.currentSliceCSRNodeOffset, DEFAULT_VECTOR_CAPACITY);
-    batchRelState.currentSliceCSRNodeOffset+=numRowsToRead;
+    auto startOffset = currCSRListEntry.offset + posInCurrentCSR + batchRelState.nextSliceCSROffset;
+    startOffset=batchRelState.nextSliceCSROffset==0?startOffset:startOffset-1;
+    auto numRowsToRead = std::min(currCSRSize - posInCurrentCSR, DEFAULT_VECTOR_CAPACITY-batchRelState.nextSliceCSROffset);
+    posInCurrentCSR+=numRowsToRead;
+    batchRelState.nextSliceCSROffset+=numRowsToRead;
     return {startOffset, startOffset + numRowsToRead};
 }
 
@@ -333,7 +335,7 @@ void RelTableData::updateResultPos(Transaction* transaction, TableDataReadState&
         return;
     }
 //    relReadState.getStartAndEndOffset();
-    auto [startOffset, endOffset] = relReadState.getStartAndEndOffset();//relReadState.getUpdateStartAndEndOffset();
+    auto [startOffset, endOffset] = relReadState.getUpdateStartAndEndOffset();//getUpdateStartAndEndOffset();//relReadState.getUpdateStartAndEndOffset();
     auto numRowsToRead = endOffset - startOffset;
     auto relIDVectorIdx = INVALID_VECTOR_IDX;
     //update result pos
@@ -359,6 +361,8 @@ void RelTableData::updateResultPos(Transaction* transaction, TableDataReadState&
 void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readState,
                         const ValueVector& inNodeIDVector, const std::vector<ValueVector*>& outputVectors) {
     auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(readState);
+    //重新生成batch了，所以读的状态要重新设置
+    relReadState.batchRelState.nextSliceCSROffset=0;
     //TODO(Jiamin): do not consider in memory scan now
     if (relReadState.readFromLocalStorage) {
         KU_UNREACHABLE;
@@ -370,7 +374,6 @@ void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readS
         return;
     }
     auto [startOffset, endOffset] = relReadState.getBatchStartAndEndOffset();
-    std::cout<<"batch read:"<<startOffset<<" "<<endOffset<<"\n";
     auto numRowsToRead = endOffset - startOffset;
     outputVectors[0]->state->selVector->setToFiltered(numRowsToRead);
     outputVectors[0]->state->setOriginalSize(numRowsToRead);

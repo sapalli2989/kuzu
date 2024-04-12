@@ -13,8 +13,8 @@ class LocalRelNG;
 struct BatchRelDataReadState {
     common::offset_t lastPosInCSR;// record the last CSR offset position in the batch
     common::offset_t maxCSRNodeOffset; //record the max csr node offset in the batch
-    common::offset_t currentSliceCSRNodeOffset;//record the max node offset in the batch
-    explicit BatchRelDataReadState() : lastPosInCSR(0), maxCSRNodeOffset{0}, currentSliceCSRNodeOffset{0} {}
+    common::offset_t nextSliceCSROffset;//record the max node offset in the batch
+    explicit BatchRelDataReadState() : lastPosInCSR(0), maxCSRNodeOffset{0}, nextSliceCSROffset{0} {}
 };
 struct RelDataReadState : public TableDataReadState {
     common::RelDataDirection direction;
