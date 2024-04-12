@@ -46,8 +46,6 @@ void RelTable::readBatch(transaction::Transaction* transaction, TableReadState& 
 bool RelTable::needRescan(TableReadState& readState){
     auto& scanState = ku_dynamic_cast<TableReadState&, RelTableReadState&>(readState);
     auto& relReadState = ku_dynamic_cast<TableDataReadState&, RelDataReadState&>(*scanState.dataReadState);
-//    if(relReadState.currentNodeOffset>relReadState.batchRelState->currentNodeOffset)
-//    std::cout << "relReadState.currentNodeOffset: " << relReadState.currentNodeOffset << " "<<relReadState.batchRelState->currentNodeOffset<<std::endl;
     auto currentCSRInfo=relReadState.csrListEntries[relReadState.currentNodeOffset-relReadState.startNodeOffset];
     return relReadState.batchRelState->maxCSRNodeOffset<currentCSRInfo.offset || relReadState.batchRelState->maxCSRNodeOffset==0;
 }

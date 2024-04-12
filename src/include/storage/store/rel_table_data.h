@@ -11,16 +11,10 @@ using density_range_t = std::pair<double, double>;
 
 class LocalRelNG;
 struct BatchRelDataReadState {
-    common::offset_t startNodeOffset;
-    common::offset_t numNodes;
-    common::offset_t numNodeRead;
-    common::offset_t currentNodeOffset;
-    common::offset_t posInCurrentCSR;
-    bool needReScan;
-    common::offset_t maxCSRNodeOffset;
-//    explicit BatchRelDataReadState() : needReScan{false} {}
-    explicit BatchRelDataReadState() : startNodeOffset(0), numNodes(0), numNodeRead(0),
-        currentNodeOffset(0), posInCurrentCSR(0), needReScan{true},  maxCSRNodeOffset{0} {}
+    common::offset_t lastPosInCSR;// record the last CSR offset position in the csr node
+    bool needReScan; // indicate whether we need to rescan/cache the batch
+    common::offset_t maxCSRNodeOffset; //record the max csr node offset in the batch
+    explicit BatchRelDataReadState() : lastPosInCSR(0), needReScan{true},  maxCSRNodeOffset{0} {}
 };
 struct RelDataReadState : public TableDataReadState {
     common::RelDataDirection direction;
@@ -152,7 +146,6 @@ public:
     void initializeReadState(transaction::Transaction* transaction,
         std::vector<common::column_id_t> columnIDs, const common::ValueVector& inNodeIDVector,
         RelDataReadState& readState);
-    void initializeBatchReadState(RelDataReadState& readState);
     void scan(transaction::Transaction* transaction, TableDataReadState& readState,
         const common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;

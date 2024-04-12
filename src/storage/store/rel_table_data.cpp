@@ -110,11 +110,11 @@ std::pair<offset_t, offset_t> RelDataReadState::getBatchStartAndEndOffset() {
 //        for(auto i=0u;i<numNodes;i++){
 //        std::cout<<"csrListEntries:"<<i<<" "<<csrListEntries[i].offset<<" "<<csrListEntries[i].size<<"\n";
 //    }
-    auto currCSRListEntryIndex = batchRelState->currentNodeOffset - batchRelState->startNodeOffset;
+    auto currCSRListEntryIndex = currentNodeOffset-startNodeOffset;
     auto startOffset = csrListEntries[currCSRListEntryIndex].offset;
     auto appendRowsToRead=0u;
     auto currentOffset=startOffset;
-    while(currCSRListEntryIndex<batchRelState->numNodes&&appendRowsToRead<DEFAULT_VECTOR_CAPACITY){
+    while(currCSRListEntryIndex<numNodes&&appendRowsToRead<DEFAULT_VECTOR_CAPACITY){
         auto nextOffset=csrListEntries[currCSRListEntryIndex].offset;
         auto nextCSRSize = csrListEntries[currCSRListEntryIndex].size;
         if(nextCSRSize==0){
@@ -137,7 +137,6 @@ std::pair<offset_t, offset_t> RelDataReadState::getBatchStartAndEndOffset() {
         currCSRListEntryIndex++;
         currentOffset=nextOffset;
     }
-    batchRelState->currentNodeOffset=currentOffset+batchRelState->startNodeOffset;
     batchRelState->maxCSRNodeOffset=currentOffset;
     return {startOffset, startOffset+appendRowsToRead};
 }
@@ -265,21 +264,12 @@ void RelTableData::initializeReadState(Transaction* transaction, std::vector<col
         KU_ASSERT(readState.csrHeaderChunks.offset->getNumValues() ==
                   readState.csrHeaderChunks.length->getNumValues());
         readState.numNodes = readState.csrHeaderChunks.offset->getNumValues();
-        readState.batchRelState->numNodes = readState.numNodes;
         readState.populateCSRListEntries();
         if (transaction->isWriteTransaction()) {
             readState.localNodeGroup = getLocalNodeGroup(transaction, nodeGroupIdx);
         }
     }
     readState.currentNodeOffset = nodeOffset;
-}
-
-void RelTableData::initializeBatchReadState(RelDataReadState& readState) {
-    readState.batchRelState->currentNodeOffset=readState.currentNodeOffset;
-    readState.batchRelState->startNodeOffset=readState.startNodeOffset;
-    readState.batchRelState->numNodes=readState.numNodes;
-    readState.batchRelState->needReScan = true;
-    readState.batchRelState->posInCurrentCSR = 0;
 }
 
 void RelTableData::scan(Transaction* transaction, TableDataReadState& readState,
@@ -345,9 +335,9 @@ void RelTableData::updateResultPos(Transaction* transaction, TableDataReadState&
     //TODO(Jiamin): replace startoffset, calculate offset in outputvector
     outputVectors[0]->state->selVector->setToFiltered(numRowsToRead);
     for(auto i=0u;i<numRowsToRead;i++){
-        outputVectors[0]->state->selVector->selectedPositions[i]=(startOffset+i)%DEFAULT_VECTOR_CAPACITY;//startOffset+i;
+        outputVectors[0]->state->selVector->selectedPositions[i]=(startOffset+i)%DEFAULT_VECTOR_CAPACITY;
      }
-    std::cout<<"read state:"<<relReadState.currentNodeOffset<<" "<<relReadState.batchRelState->currentNodeOffset<<"\n";
+//    std::cout<<"read state:"<<relReadState.currentNodeOffset<<" "<<relReadState.batchRelState->currentNodeOffset<<"\n";
     std::cout<<"update pos:"<<startOffset<<" "<<endOffset<<"\n";
     //TODO(Jiamin): do not consider in memory scan now
     if (transaction->isWriteTransaction() && relReadState.localNodeGroup) {
@@ -381,7 +371,6 @@ void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readS
     outputVectors[0]->state->selVector->setToFiltered(numRowsToRead);
     outputVectors[0]->state->setOriginalSize(numRowsToRead);
     auto nodeGroupIdx = StorageUtils::getNodeGroupIdx(relReadState.currentNodeOffset);
-//    auto nodeGroupIdx = StorageUtils::getNodeGroupIdx(relReadState.batchRelState->currentNodeOffset-relReadState.batchRelState->numNodeRead);
     auto relIDVectorIdx = INVALID_VECTOR_IDX;
     for (auto i = 0u; i < relReadState.columnIDs.size(); i++) {
         auto columnID = relReadState.columnIDs[i];
@@ -401,10 +390,6 @@ void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readS
         std::cout<<outputVectors[1]->getValue<offset_t>(j)<<" ";
     }
     std::cout<<"\n";
-//    for(auto j=0u;j<numRowsToRead;j++){
-//        std::cout<<bool(outputVectors[1]->isNull(j))<<" ";
-//    }
-//    std::cout<<"\n";
     //TODO(Jiamin): do not consider in memory scan now
     if (transaction->isWriteTransaction() && relReadState.localNodeGroup) {
         KU_UNREACHABLE;
