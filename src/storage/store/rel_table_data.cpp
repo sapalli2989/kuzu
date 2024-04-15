@@ -66,6 +66,7 @@ void RelDataReadState::populateCSRListEntries() {
 
 std::pair<offset_t, offset_t> RelDataReadState::getStartAndEndOffset() {
     auto currCSRListEntry = csrListEntries[currentNodeOffset - startNodeOffset];
+//    std::cout<<"get start :"<<currentNodeOffset<<" "<<startNodeOffset<<" "<<currCSRListEntry.size<<"\n";
     auto currCSRSize = currCSRListEntry.size;
     auto startOffset = currCSRListEntry.offset + posInCurrentCSR;
     auto numRowsToRead = std::min(currCSRSize - posInCurrentCSR, DEFAULT_VECTOR_CAPACITY);
@@ -76,71 +77,77 @@ std::pair<offset_t, offset_t> RelDataReadState::getStartAndEndOffset() {
 std::pair<offset_t, offset_t> RelDataReadState::getUpdateStartAndEndOffset() {
     auto currCSRListEntry = csrListEntries[currentNodeOffset - startNodeOffset];
     auto currCSRSize = currCSRListEntry.size;
-    auto startOffset = currCSRListEntry.offset + posInCurrentCSR + batchRelState.nextSliceCSROffset;
-    startOffset=batchRelState.nextSliceCSROffset==0?startOffset:startOffset-1;
-    auto numRowsToRead = std::min(currCSRSize - posInCurrentCSR, DEFAULT_VECTOR_CAPACITY-batchRelState.nextSliceCSROffset);
-    posInCurrentCSR+=numRowsToRead;
-    batchRelState.nextSliceCSROffset+=numRowsToRead;
+//    std::cout<<"getupdate start and offset:"<<currCSRListEntry.offset<<" "<<posInCurrentCSR<<" "<<batchRelState.nextSliceCSROffset<<" "<<batchRelState.startCSROffset<<"\n";
+//    std::cout<<"get:"<<currCSRListEntry.offset + posInCurrentCSR + batchRelState.nextSliceCSROffset - batchRelState.startCSROffset<<"\n";
+    auto startOffset = currCSRListEntry.offset + posInCurrentCSR - batchRelState.startCSROffset;; // + batchRelState.nextSliceCSROffset - batchRelState.startCSROffset;//currCSRListEntry.offset + posInCurrentCSR + batchRelState.nextSliceCSROffset - batchRelState.startCSROffset;
+    auto endOffset = startOffset+(currCSRSize-posInCurrentCSR);
+    endOffset=std::min(endOffset,DEFAULT_VECTOR_CAPACITY);
+//    std::cout<<"start offset:"<<batchRelState.startCSROffset<<" "<<currCSRListEntry.offset<<" "<<posInCurrentCSR<<" "<<startOffset<<" "<<endOffset<<"\n";
+    auto numRowsToRead = endOffset-startOffset;//std::min(currCSRSize - posInCurrentCSR, DEFAULT_VECTOR_CAPACITY-batchRelState.nextSliceCSROffset);
+    posInCurrentCSR+=numRowsToRead;//std::min(currCSRSize - posInCurrentCSR, DEFAULT_VECTOR_CAPACITY);//numRowsToRead;
+    batchRelState.nextSliceCSROffset+=numRowsToRead;//remove?
+//    std::cout<<"getUpdateStartAndEndOffset startoffset:"<<startOffset<<" "<<posInCurrentCSR<<" "<<batchRelState.nextSliceCSROffset<<"\n";
     return {startOffset, startOffset + numRowsToRead};
 }
 
+
 std::pair<offset_t, offset_t> RelDataReadState::getBatchStartAndEndOffset() {
-//    for(auto i=0u;i<numNodes;i++){
-//        std::cout<<csrListEnt
-//        ries[i].offset<<" "<<csrListEntries[i].size<<"\n";
+//    for(auto i=0u;i<csrListEntries.size();i++){
+//        if(csrListEntries[i].size!=0){
+//            std::cout<<csrListEntries[i].offset<<" "<<csrListEntries[i].size<<"\n";
+//        }
 //    }
     auto currCSRListEntryIndex = currentNodeOffset-startNodeOffset;
     auto startOffset = csrListEntries[currCSRListEntryIndex].offset + batchRelState.lastPosInCSR;
+//    std::cout<<"=================getbatch start and end offset:"<<csrListEntries[currCSRListEntryIndex].offset<<" "<<batchRelState.lastPosInCSR<<"\n";
+    batchRelState.startCSROffset=startOffset;
     auto appendRowsToRead=0u;
     auto nextCSROffset=startOffset;
     auto currentCSROffset=startOffset;
     auto currentGroupIdx=StorageUtils::getNodeGroupIdx(currentNodeOffset);
-    auto nextNodeGroupIdx=currentGroupIdx;
     auto checkNodeOffsetGroupIdx=currentNodeOffset;
     // batch read： 首先要确保batch上来的node offset都在一个nodegroup里面
     // 其次，要考虑csr gap，对于那些留了gap的csr，要读null。比如0，1，2，3，4 对应的csrstartoffset可能是0，2，5，6，csroffset不是连续的。
     // batch去读的时候，我们要先把null的csr也读上来，根据csrnodeoffset来判断是不是在当前的batch vector里面
     // 最后，我们还要考虑csr只读一半到vector的情况，vector可能只截取了一半的csr list，这个时候我们要记录pos in csr
+    //TODO(Jiamin): check here,need to loop all numnodes
     while(currCSRListEntryIndex<numNodes&&appendRowsToRead<DEFAULT_VECTOR_CAPACITY&&StorageUtils::getNodeGroupIdx(checkNodeOffsetGroupIdx)==currentGroupIdx){
-        currentCSROffset=currCSRListEntryIndex==currentNodeOffset-startNodeOffset?csrListEntries[currCSRListEntryIndex].offset+ batchRelState.lastPosInCSR:csrListEntries[currCSRListEntryIndex].offset;
+        currentCSROffset=currCSRListEntryIndex==(currentNodeOffset-startNodeOffset)?startOffset:csrListEntries[currCSRListEntryIndex].offset;
         auto currentCSRSize = csrListEntries[currCSRListEntryIndex].size;
         if(currentCSROffset==0&&currentCSRSize==0){//skip special case, gap is in the beginning?
             currCSRListEntryIndex++;
             continue;
         }
         //handle csr gap, append null
-        while(currentCSROffset<nextCSROffset){
-            // check if we are in the same node group
-            nextNodeGroupIdx=StorageUtils::getNodeGroupIdx(checkNodeOffsetGroupIdx++);
-            if(nextNodeGroupIdx!=currentGroupIdx){
-                break;
-            }
+        while(currentCSROffset>nextCSROffset){
             appendRowsToRead++;
-            currentCSROffset++;
+            nextCSROffset++;
             if(appendRowsToRead==DEFAULT_VECTOR_CAPACITY){
                 break;
             }
-        }
-        // check if we are in the same node group
-        if(nextNodeGroupIdx!=currentGroupIdx){
-            break;
         }
         if(appendRowsToRead==DEFAULT_VECTOR_CAPACITY){
             break;
         }
         //normal case, we need to check vector capacity
         auto numRowsToRead = currentCSRSize-batchRelState.lastPosInCSR;
-        if(appendRowsToRead+numRowsToRead>=DEFAULT_VECTOR_CAPACITY){
-            batchRelState.lastPosInCSR+= DEFAULT_VECTOR_CAPACITY-appendRowsToRead;
+        if(appendRowsToRead+numRowsToRead>DEFAULT_VECTOR_CAPACITY){
+            batchRelState.lastPosInCSR+=DEFAULT_VECTOR_CAPACITY-appendRowsToRead;
             appendRowsToRead=DEFAULT_VECTOR_CAPACITY;
         }else{
+            batchRelState.lastPosInCSR=0;
             appendRowsToRead+=numRowsToRead;
         }
         currCSRListEntryIndex++;
         nextCSROffset=currentCSROffset+1;
         checkNodeOffsetGroupIdx++;
     }
-    batchRelState.maxCSRNodeOffset=currentCSROffset;
+    batchRelState.maxCSRNodeOffset=startOffset+appendRowsToRead-1;
+//    if(batchRelState.lastPosInCSR==1){
+//        std::cout<<"================get batch:"<<startOffset<<" "<<startOffset+appendRowsToRead<<"\n";
+//        std::cout<<"=================batchRelState.maxCSRNodeOffset:"<<batchRelState.maxCSRNodeOffset<<"\n";
+//        std::cout<<"=================batchRelState.lastPosInCSR:"<<batchRelState.lastPosInCSR<<"\n";
+//    }
     return {startOffset, startOffset+appendRowsToRead};
 }
 
@@ -337,8 +344,8 @@ void RelTableData::updateResultPos(Transaction* transaction, TableDataReadState&
     outputVectors[0]->state->selVector->setToFiltered(numRowsToRead);
     for(auto i=0u;i<numRowsToRead;i++){
         outputVectors[0]->state->selVector->selectedPositions[i]=(startOffset+i)%DEFAULT_VECTOR_CAPACITY;
-     }
-    std::cout<<"update pos:"<<startOffset<<" "<<endOffset<<"\n";
+    }
+//    std::cout<<"update pos:"<<startOffset<<" "<<endOffset<<"\n";
     //TODO(Jiamin): do not consider in memory scan now
     if (transaction->isWriteTransaction() && relReadState.localNodeGroup) {
         auto nodeOffset =
@@ -368,6 +375,7 @@ void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readS
     }
     auto [startOffset, endOffset] = relReadState.getBatchStartAndEndOffset();
     auto numRowsToRead = endOffset - startOffset;
+    if(numRowsToRead==0) return;
     outputVectors[0]->state->selVector->setToUnfiltered(numRowsToRead);
     outputVectors[0]->state->setOriginalSize(numRowsToRead);
     auto nodeGroupIdx = StorageUtils::getNodeGroupIdx(relReadState.currentNodeOffset);
@@ -385,11 +393,11 @@ void RelTableData::scanBatch(Transaction* transaction, TableDataReadState& readS
         getColumn(columnID)->scan(transaction, nodeGroupIdx, startOffset, endOffset,
                                   outputVectors[outputVectorId], 0 /* offsetInVector */);
     }
-    std::cout<<"output vector:\n";
-    for(auto j=0u;j<numRowsToRead;j++){
-        std::cout<<outputVectors[1]->getValue<offset_t>(j)<<" ";
-    }
-    std::cout<<"\n";
+//    std::cout<<"output vector:\n";
+//    for(auto j=0u;j<numRowsToRead;j++){
+//        std::cout<<outputVectors[1]->getValue<offset_t>(j)<<" ";
+//    }
+//    std::cout<<"\n";
     //TODO(Jiamin): do not consider in memory scan now
     if (transaction->isWriteTransaction() && relReadState.localNodeGroup) {
         KU_UNREACHABLE;

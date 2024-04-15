@@ -14,7 +14,8 @@ struct BatchRelDataReadState {
     common::offset_t lastPosInCSR;// record the last CSR offset position in the batch, use for caching a piece of csr list
     common::offset_t maxCSRNodeOffset; // record the max csr node offset in the batch
     common::offset_t nextSliceCSROffset;//record the slice csr offset of read state in the batch
-    explicit BatchRelDataReadState() : lastPosInCSR(0), maxCSRNodeOffset{0}, nextSliceCSROffset{0} {}
+    common::offset_t startCSROffset; //record startCSROffset in the batch
+    explicit BatchRelDataReadState() : lastPosInCSR(0), maxCSRNodeOffset{0}, nextSliceCSROffset{0}, startCSROffset{0} {}
 };
 struct RelDataReadState : public TableDataReadState {
     common::RelDataDirection direction;
