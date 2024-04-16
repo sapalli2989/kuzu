@@ -7,6 +7,7 @@ add_library(
         function_expression.cpp
         literal_expression.cpp
         parameter_expression.cpp
+        property_expression.cpp
         variable_expression.cpp)
 
 set(ALL_OBJECT_FILES

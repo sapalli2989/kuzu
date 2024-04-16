@@ -121,12 +121,11 @@ std::shared_ptr<Expression> Binder::createPath(const std::string& pathName,
         uniqueName, pathName, std::move(nodeType), std::move(relType), children);
 }
 
-static std::vector<std::string> getPropertyNames(
-    const std::vector<TableCatalogEntry*>& tableCatalogEntries) {
+static std::vector<std::string> getPropertyNames(const std::vector<TableCatalogEntry*>& entries) {
     std::vector<std::string> result;
     std::unordered_set<std::string> propertyNamesSet;
-    for (auto& tableEntry : tableCatalogEntries) {
-        for (auto& property : tableEntry->getPropertiesRef()) {
+    for (auto& entry : entries) {
+        for (auto& property : entry->getPropertiesRef()) {
             if (propertyNamesSet.contains(property.getName())) {
                 continue;
             }
@@ -138,34 +137,29 @@ static std::vector<std::string> getPropertyNames(
 }
 
 static std::unique_ptr<Expression> createPropertyExpression(const std::string& propertyName,
-    const std::string& uniqueVariableName, const std::string& rawVariableName,
-    const std::vector<TableCatalogEntry*>& entries) {
-    bool isPrimaryKey = false;
-    if (entries.size() == 1 && entries[0]->getTableType() == TableType::NODE) {
-        auto nodeTableEntry =
-            ku_dynamic_cast<TableCatalogEntry*, NodeTableCatalogEntry*>(entries[0]);
-        isPrimaryKey =
-            nodeTableEntry->getPrimaryKeyPID() == nodeTableEntry->getPropertyID(propertyName);
-    }
-    std::unordered_map<common::table_id_t, common::property_id_t> tableIDToPropertyID;
-    std::vector<const LogicalType*> propertyDataTypes;
+    const Expression& pattern, const std::vector<TableCatalogEntry*>& entries, bool isPrimaryKey) {
+    // Check properties under the same name with the same type.
+    common::table_id_map_t<common::property_id_t> tableIDToPropertyID;
+    std::vector<LogicalType> propertyDataTypes;
     for (auto& entry : entries) {
         if (!entry->containProperty(propertyName)) {
             continue;
         }
         auto propertyID = entry->getPropertyID(propertyName);
-        propertyDataTypes.push_back(entry->getProperty(propertyID)->getDataType());
+        propertyDataTypes.push_back(*entry->getProperty(propertyID)->getDataType());
         tableIDToPropertyID.insert({entry->getTableID(), propertyID});
     }
+    KU_ASSERT(!propertyDataTypes.empty());
+    auto propertyType = propertyDataTypes[0];
     for (auto type : propertyDataTypes) {
-        if (*propertyDataTypes[0] != *type) {
+        if (propertyType != type) {
             throw BinderException(
                 stringFormat("Expected the same data type for property {} but found {} and {}.",
-                    propertyName, type->toString(), propertyDataTypes[0]->toString()));
+                    propertyName, type.toString(), propertyDataTypes[0].toString()));
         }
     }
-    return make_unique<PropertyExpression>(*propertyDataTypes[0], propertyName, uniqueVariableName,
-        rawVariableName, tableIDToPropertyID, isPrimaryKey);
+    return PropertyExpression::construct(propertyType, propertyName, pattern, tableIDToPropertyID,
+        isPrimaryKey);
 }
 
 std::shared_ptr<RelExpression> Binder::bindQueryRel(const RelPattern& relPattern,
@@ -290,8 +284,8 @@ std::shared_ptr<RelExpression> Binder::createNonRecursiveQueryRel(const std::str
                 catalog->getTableCatalogEntry(clientContext->getTx(), tableID));
         }
         // Mock existence of pIRI property.
-        auto pIRI = createPropertyExpression(std::string(rdf::IRI), queryRel->getUniqueName(),
-            queryRel->getVariableName(), resourceTableSchemas);
+        auto pIRI = createPropertyExpression(std::string(rdf::IRI), *queryRel, resourceTableSchemas,
+            false /* isPrimaryKey */);
         queryRel->addPropertyExpression(std::string(rdf::IRI), std::move(pIRI));
     }
     std::vector<StructField> fields;
@@ -430,7 +424,8 @@ std::shared_ptr<RelExpression> Binder::createRecursiveQueryRel(const parser::Rel
         *getRecursiveRelLogicalType(node->getDataType(), rel->getDataType()),
         getUniqueExpressionName(parsedName), parsedName, relTableIDs, std::move(srcNode),
         std::move(dstNode), directionType, relPattern.getRelType());
-    auto lengthExpression = expressionBinder.createInternalLengthExpression(*queryRel);
+    auto lengthExpression =
+        PropertyExpression::construct(*LogicalType::INT64(), InternalKeyword::LENGTH, *queryRel);
     auto [lowerBound, upperBound] = bindVariableLengthRelBound(relPattern);
     auto recursiveInfo = std::make_unique<RecursiveInfo>();
     recursiveInfo->lowerBound = lowerBound;
@@ -480,27 +475,12 @@ std::pair<uint64_t, uint64_t> Binder::bindVariableLengthRelBound(
 
 void Binder::bindQueryRelProperties(RelExpression& rel) {
     auto catalog = clientContext->getCatalog();
-    std::vector<TableCatalogEntry*> tableCatalogEntries;
-    for (auto tableID : rel.getTableIDs()) {
-        auto entry = catalog->getTableCatalogEntry(clientContext->getTx(), tableID);
-        tableCatalogEntries.push_back(entry);
-    }
-    auto propertyNames = getPropertyNames(tableCatalogEntries);
+    auto entries = catalog->getTableEntries(clientContext->getTx(), rel.getTableIDs());
+    auto propertyNames = getPropertyNames(entries);
     for (auto& propertyName : propertyNames) {
-        rel.addPropertyExpression(propertyName,
-            createPropertyExpression(propertyName, rel.getUniqueName(), rel.getVariableName(),
-                tableCatalogEntries));
+        auto property = createPropertyExpression(propertyName, rel, entries, false);
+        rel.addPropertyExpression(propertyName, std::move(property));
     }
-}
-
-static std::unique_ptr<Expression> createInternalNodeIDExpression(const NodeExpression& node) {
-    std::unordered_map<table_id_t, property_id_t> propertyIDPerTable;
-    for (auto tableID : node.getTableIDs()) {
-        propertyIDPerTable.insert({tableID, INVALID_PROPERTY_ID});
-    }
-    return std::make_unique<PropertyExpression>(*LogicalType::INTERNAL_ID(), InternalKeyword::ID,
-        node.getUniqueName(), node.getVariableName(), std::move(propertyIDPerTable),
-        false /* isPrimaryKey */);
 }
 
 std::shared_ptr<NodeExpression> Binder::bindQueryNode(const NodePattern& nodePattern,
@@ -555,7 +535,8 @@ std::shared_ptr<NodeExpression> Binder::createQueryNode(const std::string& parse
     std::vector<std::string> fieldNames;
     std::vector<std::unique_ptr<LogicalType>> fieldTypes;
     // Bind internal expressions
-    queryNode->setInternalID(createInternalNodeIDExpression(*queryNode));
+    queryNode->setInternalID(PropertyExpression::construct(*LogicalType::INTERNAL_ID(),
+        InternalKeyword::ID, *queryNode));
     queryNode->setLabelExpression(expressionBinder.bindLabelFunction(*queryNode));
     fieldNames.emplace_back(InternalKeyword::ID);
     fieldNames.emplace_back(InternalKeyword::LABEL);
@@ -573,13 +554,24 @@ std::shared_ptr<NodeExpression> Binder::createQueryNode(const std::string& parse
     return queryNode;
 }
 
+static bool isPrimaryKeyProperty(const std::string& propertyName,
+    const std::vector<TableCatalogEntry*>& entries) {
+    if (entries.size() > 1) {
+        return false;
+    }
+    auto entry = entries[0];
+    KU_ASSERT(entry->getTableType() == TableType::NODE);
+    auto nodeTableEntry = entry->constPtrCast<NodeTableCatalogEntry>();
+    return nodeTableEntry->getPrimaryKeyPID() == nodeTableEntry->getPropertyID(propertyName);
+}
+
 void Binder::bindQueryNodeProperties(NodeExpression& node) {
-    auto tableSchemas =
-        clientContext->getCatalog()->getTableSchemas(clientContext->getTx(), node.getTableIDs());
-    auto propertyNames = getPropertyNames(tableSchemas);
+    auto catalog = clientContext->getCatalog();
+    auto entries = catalog->getTableEntries(clientContext->getTx(), node.getTableIDs());
+    auto propertyNames = getPropertyNames(entries);
     for (auto& propertyName : propertyNames) {
-        auto property = createPropertyExpression(propertyName, node.getUniqueName(),
-            node.getVariableName(), tableSchemas);
+        auto isPrimaryKey = isPrimaryKeyProperty(propertyName, entries);
+        auto property = createPropertyExpression(propertyName, node, entries, isPrimaryKey);
         node.addPropertyExpression(propertyName, std::move(property));
     }
 }

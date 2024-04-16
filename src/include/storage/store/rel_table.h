@@ -9,11 +9,14 @@ namespace storage {
 
 struct RelTableReadState : public TableReadState {
     common::RelDataDirection direction;
+    // TODO
+    common::ValueVector* directionVector;
+
 
     RelTableReadState(const common::ValueVector& nodeIDVector,
         const std::vector<common::column_id_t>& columnIDs,
-        const std::vector<common::ValueVector*>& outputVectors, common::RelDataDirection direction)
-        : TableReadState{nodeIDVector, columnIDs, outputVectors}, direction{direction} {
+        const std::vector<common::ValueVector*>& outputVectors, common::RelDataDirection direction, common::ValueVector* directionVector)
+        : TableReadState{nodeIDVector, columnIDs, outputVectors}, direction{direction}, directionVector{directionVector} {
         dataReadState = std::make_unique<RelDataReadState>();
     }
 

@@ -8,12 +8,16 @@ namespace kuzu {
 namespace processor {
 
 void RelTableCollectionScanner::init(ValueVector* inVector,
-    const std::vector<ValueVector*>& outputVectors) {
+    const std::vector<ValueVector*>& outputVectors, const ResultSet& resultSet) {
     readStates.resize(scanInfos.size());
     for (auto i = 0u; i < scanInfos.size(); i++) {
         auto scanInfo = scanInfos[i].get();
+        ValueVector* directionVector = nullptr;
+        if (scanInfo->directionPos.isValid()) {
+            directionVector = resultSet.getValueVector(scanInfo->directionPos).get();
+        }
         readStates[i] = std::make_unique<RelTableReadState>(*inVector, scanInfo->columnIDs,
-            outputVectors, scanInfo->direction);
+            outputVectors, scanInfo->direction, directionVector);
     }
 }
 
@@ -51,7 +55,7 @@ std::unique_ptr<RelTableCollectionScanner> RelTableCollectionScanner::clone() co
 void ScanMultiRelTable::initLocalStateInternal(ResultSet* resultSet, ExecutionContext* context) {
     ScanRelTable::initLocalStateInternal(resultSet, context);
     for (auto& [_, scanner] : scannerPerNodeTable) {
-        scanner->init(inVector, outVectors);
+        scanner->init(inVector, outVectors, *resultSet);
     }
     currentScanner = nullptr;
 }

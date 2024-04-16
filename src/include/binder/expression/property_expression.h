@@ -10,54 +10,62 @@ namespace binder {
 class PropertyExpression : public Expression {
 public:
     PropertyExpression(common::LogicalType dataType, const std::string& propertyName,
-        const std::string& uniqueVariableName, const std::string& rawVariableName,
-        std::unordered_map<common::table_id_t, common::property_id_t> propertyIDPerTable,
-        bool isPrimaryKey_)
+        const std::string& uniqueVarName, const std::string& varName,
+        common::table_id_map_t<common::property_id_t> propertyIDPerTable, bool isPrimaryKey_)
         : Expression{common::ExpressionType::PROPERTY, std::move(dataType),
-              uniqueVariableName + "." + propertyName},
-          isPrimaryKey_{isPrimaryKey_}, propertyName{propertyName},
-          uniqueVariableName{uniqueVariableName}, rawVariableName{rawVariableName},
-          propertyIDPerTable{std::move(propertyIDPerTable)} {}
-
+              getUniqueName(uniqueVarName, propertyName)},
+          isPrimaryKey_{isPrimaryKey_}, propertyName{propertyName}, uniqueVarName{uniqueVarName},
+          varName{varName}, propertyIDPerTable{std::move(propertyIDPerTable)} {}
     PropertyExpression(const PropertyExpression& other)
         : Expression{common::ExpressionType::PROPERTY, other.dataType, other.uniqueName},
           isPrimaryKey_{other.isPrimaryKey_}, propertyName{other.propertyName},
-          uniqueVariableName{other.uniqueVariableName}, rawVariableName{other.rawVariableName},
+          uniqueVarName{other.uniqueVarName}, varName{other.varName},
           propertyIDPerTable{other.propertyIDPerTable} {}
 
-    inline bool isPrimaryKey() const { return isPrimaryKey_; }
+    // Construct from a property that is stored physically.
+    static std::unique_ptr<PropertyExpression> construct(common::LogicalType type,
+        const std::string& propertyName, const Expression& pattern,
+        const common::table_id_map_t<common::property_id_t>& propertyIDPerTable, bool isPrimaryKey);
+    // Construct from a virtual property, i.e. no propertyID available.
+    static std::unique_ptr<PropertyExpression> construct(common::LogicalType type,
+        const std::string& propertyName, const Expression& pattern);
 
-    inline std::string getPropertyName() const { return propertyName; }
+    bool isPrimaryKey() const { return isPrimaryKey_; }
+    std::string getPropertyName() const { return propertyName; }
+    // TODO: rename me
+    std::string getVariableName() const { return uniqueVarName; }
 
-    inline std::string getVariableName() const { return uniqueVariableName; }
-
-    inline bool hasPropertyID(common::table_id_t tableID) const {
+    bool hasPropertyID(common::table_id_t tableID) const {
         return propertyIDPerTable.contains(tableID);
     }
-    inline common::property_id_t getPropertyID(common::table_id_t tableID) const {
+    common::property_id_t getPropertyID(common::table_id_t tableID) const {
         KU_ASSERT(propertyIDPerTable.contains(tableID));
         return propertyIDPerTable.at(tableID);
     }
 
-    inline bool isInternalID() const { return getPropertyName() == common::InternalKeyword::ID; }
-    inline bool isIRI() const { return getPropertyName() == common::rdf::IRI; }
+    bool isInternalID() const { return getPropertyName() == common::InternalKeyword::ID; }
+    bool isIRI() const { return getPropertyName() == common::rdf::IRI; }
 
-    inline std::unique_ptr<Expression> copy() const override {
-        return make_unique<PropertyExpression>(*this);
+    std::unique_ptr<Expression> copy() const override {
+        return std::make_unique<PropertyExpression>(*this);
     }
 
-    inline std::string toStringInternal() const final {
-        return rawVariableName + "." + propertyName;
+private:
+    std::string toStringInternal() const final { return varName + "." + propertyName; }
+
+    static std::string getUniqueName(const std::string& uniqueVarName,
+        const std::string& propertyName) {
+        return uniqueVarName + "." + propertyName;
     }
 
 private:
     bool isPrimaryKey_ = false;
     std::string propertyName;
     // unique identifier references to a node/rel table.
-    std::string uniqueVariableName;
+    std::string uniqueVarName;
     // printable identifier references to a node/rel table.
-    std::string rawVariableName;
-    std::unordered_map<common::table_id_t, common::property_id_t> propertyIDPerTable;
+    std::string varName;
+    common::table_id_map_t<common::property_id_t> propertyIDPerTable;
 };
 
 } // namespace binder

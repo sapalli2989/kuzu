@@ -306,10 +306,10 @@ std::string CatalogContent::getTableName(table_id_t tableID) const {
 }
 
 CatalogEntry* CatalogContent::getTableCatalogEntry(table_id_t tableID) const {
-    for (auto& [name, table] : tables->getEntries()) {
-        auto tableEntry = ku_dynamic_cast<CatalogEntry*, TableCatalogEntry*>(table.get());
+    for (auto& [name, entry] : tables->getEntries()) {
+        auto tableEntry = entry->constPtrCast<TableCatalogEntry>();
         if (tableEntry->getTableID() == tableID) {
-            return table.get();
+            return entry.get();
         }
     }
     KU_UNREACHABLE;

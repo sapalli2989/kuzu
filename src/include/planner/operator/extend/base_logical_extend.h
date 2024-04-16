@@ -16,10 +16,10 @@ public:
         : LogicalOperator{operatorType, std::move(child)}, boundNode{std::move(boundNode)},
           nbrNode{std::move(nbrNode)}, rel{std::move(rel)}, direction{direction} {}
 
-    inline std::shared_ptr<binder::NodeExpression> getBoundNode() const { return boundNode; }
-    inline std::shared_ptr<binder::NodeExpression> getNbrNode() const { return nbrNode; }
-    inline std::shared_ptr<binder::RelExpression> getRel() const { return rel; }
-    inline ExtendDirection getDirection() const { return direction; }
+    std::shared_ptr<binder::NodeExpression> getBoundNode() const { return boundNode; }
+    std::shared_ptr<binder::NodeExpression> getNbrNode() const { return nbrNode; }
+    std::shared_ptr<binder::RelExpression> getRel() const { return rel; }
+    ExtendDirection getDirection() const { return direction; }
     virtual f_group_pos_set getGroupsPosToFlatten() = 0;
 
     std::string getExpressionsForPrinting() const override;

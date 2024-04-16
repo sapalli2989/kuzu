@@ -122,6 +122,13 @@ void RelTable::scan(Transaction* transaction, RelTableReadState& scanState) {
     auto tableData = getDirectedTableData(scanState.direction);
     tableData->scan(transaction, *scanState.dataReadState, scanState.nodeIDVector,
         scanState.outputVectors);
+    if (scanState.directionVector != nullptr) {
+        auto selVector = scanState.outputVectors[0]->state->selVector.get();
+        KU_ASSERT(selVector->isUnfiltered());
+        for (auto i = 0u; i < selVector->selectedSize; ++i) {
+            scanState.directionVector->setValue<bool>(i, scanState.direction == RelDataDirection::FWD);
+        }
+    }
 }
 
 void RelTable::addColumn(Transaction* transaction, const Property& property,

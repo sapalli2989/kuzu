@@ -18,12 +18,9 @@ public:
 
     void evaluate(main::ClientContext* clientContext) override;
 
-    bool select(common::SelectionVector& /*selVector*/,
-        main::ClientContext* /*clientContext*/) override {
-        KU_UNREACHABLE;
-    }
+    bool select(common::SelectionVector&, main::ClientContext*) override { KU_UNREACHABLE; }
 
-    inline std::unique_ptr<ExpressionEvaluator> clone() override {
+    std::unique_ptr<ExpressionEvaluator> clone() override {
         std::vector<std::unique_ptr<ExpressionEvaluator>> clonedChildren;
         clonedChildren.reserve(children.size());
         for (auto& child : children) {

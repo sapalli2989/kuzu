@@ -10,13 +10,13 @@ public:
     explicit RelTableCollectionScanner(std::vector<std::unique_ptr<ScanRelTableInfo>> scanInfos)
         : scanInfos{std::move(scanInfos)} {}
 
-    inline void resetState() {
+    void resetState() {
         currentTableIdx = 0;
         nextTableIdx = 0;
     }
 
     void init(common::ValueVector* inVector,
-        const std::vector<common::ValueVector*>& outputVectors);
+        const std::vector<common::ValueVector*>& outputVectors, const ResultSet& resultSet);
     bool scan(common::ValueVector* inVector, const std::vector<common::ValueVector*>& outputVectors,
         transaction::Transaction* transaction);
 

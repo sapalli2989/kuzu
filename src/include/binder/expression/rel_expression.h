@@ -13,6 +13,12 @@ enum class RelDirectionType : uint8_t {
     UNKNOWN = 2,
 };
 
+struct DirectionInfo {
+    RelDirectionType type;
+    //
+    std::shared_ptr<Expression> expr;
+};
+
 class RelExpression;
 
 struct RecursiveInfo {
@@ -43,9 +49,12 @@ struct RecursiveInfo {
     // Projection list
     expression_vector nodeProjectionList;
     expression_vector relProjectionList;
+
+
 };
 
 struct RdfPredicateInfo {
+    //
     std::vector<common::table_id_t> resourceTableIDs;
     std::shared_ptr<Expression> predicateID;
 
@@ -66,49 +75,50 @@ public:
           srcNode{std::move(srcNode)}, dstNode{std::move(dstNode)}, directionType{directionType},
           relType{relType} {}
 
-    inline bool isRecursive() const {
+    bool isRecursive() const {
         return dataType.getLogicalTypeID() == common::LogicalTypeID::RECURSIVE_REL;
     }
 
-    inline bool isBoundByMultiLabeledNode() const {
+    bool isBoundByMultiLabeledNode() const {
         return srcNode->isMultiLabeled() || dstNode->isMultiLabeled();
     }
 
-    inline std::shared_ptr<NodeExpression> getSrcNode() const { return srcNode; }
-    inline std::string getSrcNodeName() const { return srcNode->getUniqueName(); }
-    inline void setDstNode(std::shared_ptr<NodeExpression> node) { dstNode = std::move(node); }
-    inline std::shared_ptr<NodeExpression> getDstNode() const { return dstNode; }
-    inline std::string getDstNodeName() const { return dstNode->getUniqueName(); }
+    std::shared_ptr<NodeExpression> getSrcNode() const { return srcNode; }
+    std::string getSrcNodeName() const { return srcNode->getUniqueName(); }
+    void setDstNode(std::shared_ptr<NodeExpression> node) { dstNode = std::move(node); }
+    std::shared_ptr<NodeExpression> getDstNode() const { return dstNode; }
+    std::string getDstNodeName() const { return dstNode->getUniqueName(); }
 
-    inline common::QueryRelType getRelType() const { return relType; }
+    common::QueryRelType getRelType() const { return relType; }
 
-    inline RelDirectionType getDirectionType() const { return directionType; }
+    RelDirectionType getDirectionType() const { return directionType; }
 
-    inline std::shared_ptr<Expression> getInternalIDProperty() const {
+    std::shared_ptr<Expression> getInternalIDProperty() const {
         return getPropertyExpression(common::InternalKeyword::ID);
     }
 
-    inline void setRecursiveInfo(std::unique_ptr<RecursiveInfo> recursiveInfo_) {
+    void setRecursiveInfo(std::unique_ptr<RecursiveInfo> recursiveInfo_) {
         recursiveInfo = std::move(recursiveInfo_);
     }
-    inline RecursiveInfo* getRecursiveInfo() const { return recursiveInfo.get(); }
-    inline size_t getLowerBound() const { return recursiveInfo->lowerBound; }
-    inline size_t getUpperBound() const { return recursiveInfo->upperBound; }
-    inline std::shared_ptr<Expression> getLengthExpression() const {
+    const RecursiveInfo* getRecursiveInfo() const { return recursiveInfo.get(); }
+    size_t getLowerBound() const { return recursiveInfo->lowerBound; }
+    size_t getUpperBound() const { return recursiveInfo->upperBound; }
+    std::shared_ptr<Expression> getLengthExpression() const {
         return recursiveInfo->lengthExpression;
     }
 
-    inline void setRdfPredicateInfo(std::unique_ptr<RdfPredicateInfo> info) {
+    void setRdfPredicateInfo(std::unique_ptr<RdfPredicateInfo> info) {
         rdfPredicateInfo = std::move(info);
     }
-    inline RdfPredicateInfo* getRdfPredicateInfo() const { return rdfPredicateInfo.get(); }
+    RdfPredicateInfo* getRdfPredicateInfo() const { return rdfPredicateInfo.get(); }
 
-    inline bool isSelfLoop() const { return *srcNode == *dstNode; }
+    bool isSelfLoop() const { return *srcNode == *dstNode; }
 
 private:
     std::shared_ptr<NodeExpression> srcNode;
     std::shared_ptr<NodeExpression> dstNode;
-    RelDirectionType directionType;
+//    std::shared_ptr<Expression> directionExpr;
+//    RelDirectionType directionType;
     common::QueryRelType relType;
     std::unique_ptr<RecursiveInfo> recursiveInfo;
     std::unique_ptr<RdfPredicateInfo> rdfPredicateInfo;

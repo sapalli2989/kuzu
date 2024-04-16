@@ -85,7 +85,7 @@ static std::unique_ptr<RelTableCollectionScanner> populateRelTableCollectionScan
 }
 
 std::unique_ptr<PhysicalOperator> PlanMapper::mapExtend(LogicalOperator* logicalOperator) {
-    auto extend = (LogicalExtend*)logicalOperator;
+    auto extend = logicalOperator->constPtrCast<LogicalExtend>();
     auto outFSchema = extend->getSchema();
     auto inFSchema = extend->getChild(0)->getSchema();
     auto boundNode = extend->getBoundNode();
@@ -102,6 +102,9 @@ std::unique_ptr<PhysicalOperator> PlanMapper::mapExtend(LogicalOperator* logical
     }
     if (!rel->isMultiLabeled() && !boundNode->isMultiLabeled() &&
         extendDirection != ExtendDirection::BOTH) {
+
+//        auto entry =
+
         auto relTableEntry = ku_dynamic_cast<TableCatalogEntry*, RelTableCatalogEntry*>(
             clientContext->getCatalog()->getTableCatalogEntry(clientContext->getTx(),
                 rel->getSingleTableID()));

@@ -47,7 +47,7 @@ public:
     std::vector<RelGroupCatalogEntry*> getRelTableGroupEntries(transaction::Transaction* tx) const;
     std::vector<RDFGraphCatalogEntry*> getRdfGraphEntries(transaction::Transaction* tx) const;
     std::vector<TableCatalogEntry*> getTableEntries(transaction::Transaction* tx) const;
-    std::vector<TableCatalogEntry*> getTableSchemas(transaction::Transaction* tx,
+    std::vector<TableCatalogEntry*> getTableEntries(transaction::Transaction* tx,
         const common::table_id_vector_t& tableIDs) const;
     bool relTableExistInRelTableGroup(transaction::Transaction* tx,
         common::table_id_t tableID) const;

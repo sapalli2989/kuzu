@@ -295,18 +295,6 @@ std::shared_ptr<Expression> ExpressionBinder::bindLabelFunction(const Expression
         std::move(bindData), std::move(children), execFunc, nullptr, uniqueExpressionName);
 }
 
-std::unique_ptr<Expression> ExpressionBinder::createInternalLengthExpression(
-    const Expression& expression) {
-    auto& rel = (RelExpression&)expression;
-    std::unordered_map<table_id_t, property_id_t> propertyIDPerTable;
-    for (auto tableID : rel.getTableIDs()) {
-        propertyIDPerTable.insert({tableID, INVALID_PROPERTY_ID});
-    }
-    return std::make_unique<PropertyExpression>(LogicalType(LogicalTypeID::INT64),
-        InternalKeyword::LENGTH, rel.getUniqueName(), rel.getVariableName(),
-        std::move(propertyIDPerTable), false /* isPrimaryKey */);
-}
-
 std::shared_ptr<Expression> ExpressionBinder::bindRecursiveJoinLengthFunction(
     const Expression& expression) {
     if (expression.getDataType().getLogicalTypeID() != LogicalTypeID::RECURSIVE_REL) {
