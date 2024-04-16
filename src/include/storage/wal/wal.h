@@ -94,6 +94,7 @@ private:
     common::VirtualFileSystem* vfs;
     bool isEmpty;
     bool isLastRecordCommit;
+    bool readOnly;
 };
 
 } // namespace storage

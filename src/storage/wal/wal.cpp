@@ -19,7 +19,7 @@ namespace storage {
 WAL::WAL(const std::string& directory, bool readOnly, BufferManager& bufferManager,
     VirtualFileSystem* vfs)
     : directory{directory}, bufferManager{bufferManager}, vfs{vfs}, isEmpty{true},
-      isLastRecordCommit{false} {
+      isLastRecordCommit{false}, readOnly{readOnly} {
     auto fileInfo =
         vfs->openFile(vfs->joinPath(directory, std::string(StorageConstants::WAL_FILE_SUFFIX)),
             readOnly ? O_RDONLY : O_CREAT | O_RDWR);
@@ -33,10 +33,12 @@ WAL::WAL(const std::string& directory, bool readOnly, BufferManager& bufferManag
 }
 
 WAL::~WAL() {
-    try {
-        flushAllPages();
-    } catch (IOException& e) {
-        spdlog::error("Failed to flush WAL: {}", e.what());
+    if (!readOnly) {
+        try {
+            flushAllPages();
+        } catch (IOException& e) {
+            spdlog::error("Failed to flush WAL: {}", e.what());
+        }
     }
 }
 
