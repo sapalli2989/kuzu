@@ -30,8 +30,13 @@ void PyConnection::initialize(py::handle& m) {
         .def("get_num_rels", &PyConnection::getNumRels, py::arg("rel_name"))
         .def("get_all_edges_for_torch_geometric", &PyConnection::getAllEdgesForTorchGeometric,
             py::arg("np_array"), py::arg("src_table_name"), py::arg("rel_name"),
-            py::arg("dst_table_name"), py::arg("query_batch_size"));
+            py::arg("dst_table_name"), py::arg("query_batch_size"))
+        .def("import_pyarrow_test", &PyConnection::importPyarrowTest);
     PyDateTime_IMPORT;
+}
+
+py::handle PyConnection::importPyarrowTest() {
+    return py::module::import("pyarrow");
 }
 
 PyConnection::PyConnection(PyDatabase* pyDatabase, uint64_t numThreads) {

@@ -35,6 +35,8 @@ public:
 
     static bool isPandasDataframe(const py::object& object);
 
+    py::handle importPyarrowTest();
+
 private:
     std::unique_ptr<StorageDriver> storageDriver;
     std::unique_ptr<Connection> conn;
