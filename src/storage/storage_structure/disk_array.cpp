@@ -18,6 +18,16 @@ using namespace kuzu::transaction;
 namespace kuzu {
 namespace storage {
 
+// Header can be read or write since it just needs the sizes
+static inline PageCursor getAPIdxAndOffsetInAP(const DiskArrayHeader& header, uint64_t idx) {
+    // We assume that `numElementsPerPageLog2`, `elementPageOffsetMask`,
+    // `alignedElementSizeLog2` are never modified throughout transactional updates, thus, we
+    // directly use them from header here.
+    common::page_idx_t apIdx = idx >> header.numElementsPerPageLog2;
+    uint16_t byteOffsetInAP = (idx & header.elementPageOffsetMask) << header.alignedElementSizeLog2;
+    return PageCursor{apIdx, byteOffsetInAP};
+}
+
 DiskArrayHeader::DiskArrayHeader(uint64_t elementSize)
     : alignedElementSizeLog2{(uint64_t)ceil(log2(elementSize))},
       numElementsPerPageLog2{BufferPoolConstants::PAGE_4KB_SIZE_LOG2 - alignedElementSizeLog2},
@@ -74,7 +84,7 @@ DiskArrayInternal::DiskArrayInternal(FileHandle& fileHandle, DBFileID dbFileID,
 void DiskArrayInternal::updateLastPageOnDisk() {
     auto numElements = getNumElementsNoLock(TransactionType::READ_ONLY);
     if (numElements > 0) {
-        auto apCursor = getAPIdxAndOffsetInAP(numElements - 1);
+        auto apCursor = getAPIdxAndOffsetInAP(header, numElements - 1);
         lastPageOnDisk = getAPPageIdxNoLock(apCursor.pageIdx, TransactionType::READ_ONLY);
     } else {
         lastPageOnDisk = 0;
@@ -101,7 +111,7 @@ bool DiskArrayInternal::checkOutOfBoundAccess(TransactionType trxType, uint64_t 
 void DiskArrayInternal::get(uint64_t idx, TransactionType trxType, std::span<uint8_t> val) {
     std::shared_lock sLck{diskArraySharedMtx};
     KU_ASSERT(checkOutOfBoundAccess(trxType, idx));
-    auto apCursor = getAPIdxAndOffsetInAP(idx);
+    auto apCursor = getAPIdxAndOffsetInAP(header, idx);
     page_idx_t apPageIdx = getAPPageIdxNoLock(apCursor.pageIdx, trxType);
     auto& bmFileHandle = (BMFileHandle&)fileHandle;
     if (trxType == TransactionType::READ_ONLY || !hasTransactionalUpdates ||
@@ -143,7 +153,7 @@ void DiskArrayInternal::update(uint64_t idx, std::span<uint8_t> val) {
     std::unique_lock xLck{diskArraySharedMtx};
     hasTransactionalUpdates = true;
     KU_ASSERT(checkOutOfBoundAccess(TransactionType::WRITE, idx));
-    auto apCursor = getAPIdxAndOffsetInAP(idx);
+    auto apCursor = getAPIdxAndOffsetInAP(header, idx);
     // TODO: We are currently supporting only DiskArrays that can grow in size and not
     // those that can shrink in size. That is why we can use
     // getAPPageIdxNoLock(apIdx, Transaction::WRITE) directly to compute the physical page Idx
@@ -344,7 +354,7 @@ DiskArrayInternal::WriteIterator& DiskArrayInternal::WriteIterator::seek(size_t 
     KU_ASSERT(newIdx < diskArray.headerForWriteTrx.numElements);
     auto oldPageIdx = apCursor.pageIdx;
     idx = newIdx;
-    apCursor = diskArray.getAPIdxAndOffsetInAP(idx);
+    apCursor = getAPIdxAndOffsetInAP(diskArray.header, idx);
     if (oldPageIdx != apCursor.pageIdx) {
         common::page_idx_t apPageIdx = diskArray.getAPPageIdxNoLock(apCursor.pageIdx, TRX_TYPE);
         getPage(apPageIdx, false /*isNewlyAdded*/);
@@ -355,7 +365,7 @@ DiskArrayInternal::WriteIterator& DiskArrayInternal::WriteIterator::seek(size_t 
 void DiskArrayInternal::WriteIterator::pushBack(std::span<uint8_t> val) {
     idx = diskArray.headerForWriteTrx.numElements++;
     auto oldPageIdx = apCursor.pageIdx;
-    apCursor = diskArray.getAPIdxAndOffsetInAP(idx);
+    apCursor = getAPIdxAndOffsetInAP(diskArray.header, idx);
     // If this would add a new page, pin new page and update PIP
     auto [apPageIdx, isNewlyAdded] =
         diskArray.getAPPageIdxAndAddAPToPIPIfNecessaryForWriteTrxNoLock(
@@ -402,17 +412,21 @@ DiskArrayInternal::WriteIterator DiskArrayInternal::iter_mut(uint64_t valueSize)
     return DiskArrayInternal::WriteIterator(valueSize, *this);
 }
 
+common::page_idx_t DiskArrayInternal::getAPIdx(uint64_t idx) const {
+    return getAPIdxAndOffsetInAP(header, idx).pageIdx;
+}
+
 // [] operator to be used when building an InMemDiskArrayBuilder without transactional updates.
 // This changes the contents directly in memory and not on disk (nor on the wal)
 uint8_t* InMemDiskArrayBuilderInternal::operator[](uint64_t idx) {
-    auto apCursor = DiskArrayInternal::getAPIdxAndOffsetInAP(idx);
+    auto apCursor = getAPIdxAndOffsetInAP(header, idx);
     KU_ASSERT(apCursor.pageIdx < this->header.numAPs);
     return inMemArrayPages[apCursor.pageIdx].get() + apCursor.elemPosInPage;
 }
 
-InMemDiskArrayBuilderInternal::InMemDiskArrayBuilderInternal(FileHandle& fileHandle,
-    page_idx_t headerPageIdx, uint64_t numElements, size_t elementSize, bool setToZero)
-    : DiskArrayInternal(fileHandle, headerPageIdx, elementSize) {
+InMemDiskArrayBuilderInternal::InMemDiskArrayBuilderInternal(uint64_t numElements,
+    size_t elementSize, bool setToZero)
+    : header{elementSize} {
 
     setNumElementsAndAllocateDiskAPsForBuilding(numElements);
     for (uint64_t i = 0; i < this->header.numAPs; ++i) {
@@ -429,47 +443,12 @@ void InMemDiskArrayBuilderInternal::resize(uint64_t newNumElements, bool setToZe
     }
 }
 
-void InMemDiskArrayBuilderInternal::saveToDisk() {
-    // save the header and pips.
-    this->header.saveToDisk(this->fileHandle, this->headerPageIdx);
-    for (auto i = 0u; i < this->pips.size(); ++i) {
-        this->fileHandle.writePage(reinterpret_cast<uint8_t*>(&this->pips[i].pipContents),
-            this->pips[i].pipPageIdx);
-    }
-    // Save array pages
-    for (page_idx_t apIdx = 0; apIdx < this->header.numAPs; ++apIdx) {
-        this->fileHandle.writePage(reinterpret_cast<uint8_t*>(this->inMemArrayPages[apIdx].get()),
-            this->getAPPageIdxNoLock(apIdx));
-    }
-}
-
-void InMemDiskArrayBuilderInternal::addNewArrayPageForBuilding() {
-    uint64_t arrayPageIdx = this->fileHandle.addNewPage();
-    // The idx of the next array page will be exactly header.numArrayPages. That is why we first
-    // find the pipIdx and offset in the PIP of the array page before incrementing
-    // header.numArrayPages by 1.
-    auto pipIdxAndOffset =
-        StorageUtils::getQuotientRemainder(this->header.numAPs, NUM_PAGE_IDXS_PER_PIP);
-    this->header.numAPs++;
-    uint64_t pipIdx = pipIdxAndOffset.first;
-    if (pipIdx == this->pips.size()) {
-        uint64_t pipPageIdx = this->fileHandle.addNewPage();
-        this->pips.emplace_back(pipPageIdx);
-        if (pipIdx == 0) {
-            this->header.firstPIPPageIdx = pipPageIdx;
-        } else {
-            this->pips[pipIdx - 1].pipContents.nextPipPageIdx = pipPageIdx;
-        }
-    }
-    this->pips[pipIdx].pipContents.pageIdxs[pipIdxAndOffset.second] = arrayPageIdx;
-}
-
 void InMemDiskArrayBuilderInternal::setNumElementsAndAllocateDiskAPsForBuilding(
     uint64_t newNumElements) {
     uint64_t oldNumArrayPages = this->header.numAPs;
     uint64_t newNumArrayPages = getNumArrayPagesNeededForElements(newNumElements);
     for (auto i = oldNumArrayPages; i < newNumArrayPages; ++i) {
-        addNewArrayPageForBuilding();
+        addInMemoryArrayPage(true);
     }
     this->header.numElements = newNumElements;
     this->header.numAPs = newNumArrayPages;

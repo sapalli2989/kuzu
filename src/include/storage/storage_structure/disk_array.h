@@ -191,9 +191,7 @@ public:
 
     WriteIterator iter_mut(uint64_t valueSize);
 
-    inline common::page_idx_t getAPIdx(uint64_t idx) const {
-        return getAPIdxAndOffsetInAP(idx).pageIdx;
-    }
+    inline common::page_idx_t getAPIdx(uint64_t idx) const;
 
 protected:
     // Updates to new pages (new to this transaction) bypass the wal file.
@@ -225,16 +223,6 @@ protected:
     void clearWALPageVersionAndRemovePageFromFrameIfNecessary(common::page_idx_t pageIdx);
 
     virtual void checkpointOrRollbackInMemoryIfNecessaryNoLock(bool isCheckpoint);
-
-    inline PageCursor getAPIdxAndOffsetInAP(uint64_t idx) const {
-        // We assume that `numElementsPerPageLog2`, `elementPageOffsetMask`,
-        // `alignedElementSizeLog2` are never modified throughout transactional updates, thus, we
-        // directly use them from header here.
-        common::page_idx_t apIdx = idx >> header.numElementsPerPageLog2;
-        uint16_t byteOffsetInAP = (idx & header.elementPageOffsetMask)
-                                  << header.alignedElementSizeLog2;
-        return PageCursor{apIdx, byteOffsetInAP};
-    }
 
 private:
     bool checkOutOfBoundAccess(transaction::TransactionType trxType, uint64_t idx);
@@ -376,19 +364,16 @@ private:
     DiskArrayInternal diskArray;
 };
 
-class InMemDiskArrayBuilderInternal : public DiskArrayInternal {
+class InMemDiskArrayBuilderInternal {
 public:
-    InMemDiskArrayBuilderInternal(FileHandle& fileHandle, common::page_idx_t headerPageIdx,
-        uint64_t numElements, size_t elementSize, bool setToZero = false);
+    InMemDiskArrayBuilderInternal(uint64_t numElements, size_t elementSize, bool setToZero = false);
 
     // This function is designed to be used during building of a disk array, i.e., during loading.
     // In particular, it changes the needed capacity non-transactionally, i.e., without writing
     // anything to the wal.
     void resize(uint64_t newNumElements, bool setToZero);
 
-    void saveToDisk();
-
-    inline uint64_t getNumElements() const { return header.numElements; }
+    inline uint64_t size() const { return header.numElements; }
 
     // [] operator can be used to update elements, e.g., diskArray[5] = 4, when building an
     // InMemDiskArrayBuilder without transactional updates. This changes the contents directly in
@@ -407,7 +392,7 @@ protected:
     }
 
 private:
-    inline uint64_t getNumArrayPagesNeededForElements(uint64_t numElements) {
+    inline uint64_t getNumArrayPagesNeededForElements(uint64_t numElements) const {
         return (numElements >> this->header.numElementsPerPageLog2) +
                ((numElements & this->header.elementPageOffsetMask) > 0 ? 1 : 0);
     }
@@ -417,14 +402,13 @@ private:
 
 protected:
     std::vector<std::unique_ptr<uint8_t[]>> inMemArrayPages;
+    DiskArrayHeader header;
 };
 
 template<typename U>
 class InMemDiskArrayBuilder {
 public:
-    InMemDiskArrayBuilder(FileHandle& fileHandle, common::page_idx_t headerPageIdx,
-        uint64_t numElements, bool setToZero = false)
-        : diskArray(fileHandle, headerPageIdx, numElements, sizeof(U), setToZero) {}
+    InMemDiskArrayBuilder(uint64_t numElements = 0) : diskArray(numElements, sizeof(U), true) {}
 
     inline U& operator[](uint64_t idx) { return *(U*)diskArray[idx]; }
 
@@ -432,10 +416,7 @@ public:
         diskArray.resize(newNumElements, setToZero);
     }
 
-    inline uint64_t getNumElements() const { return diskArray.getNumElements(); }
-    inline uint64_t size() const { return diskArray.getNumElements(); }
-
-    inline void saveToDisk() { diskArray.saveToDisk(); }
+    inline uint64_t size() const { return diskArray.size(); }
 
     static constexpr uint32_t getAlignedElementSize() {
         return DiskArray<U>::getAlignedElementSize();
