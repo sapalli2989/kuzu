@@ -116,17 +116,17 @@ public:
     uint64_t getNumElements(
         transaction::TransactionType trxType = transaction::TransactionType::READ_ONLY);
 
-    void get(uint64_t idx, transaction::TransactionType trxType, std::span<uint8_t> val);
+    void get(uint64_t idx, transaction::TransactionType trxType, std::span<std::byte> val);
 
     // Note: This function is to be used only by the WRITE trx.
-    void update(uint64_t idx, std::span<uint8_t> val);
+    void update(uint64_t idx, std::span<std::byte> val);
 
     // Note: This function is to be used only by the WRITE trx.
     // The return value is the idx of val in array.
-    uint64_t pushBack(std::span<uint8_t> val);
+    uint64_t pushBack(std::span<std::byte> val);
 
     // Note: Currently, this function doesn't support shrinking the size of the array.
-    uint64_t resize(uint64_t newNumElements, std::span<uint8_t> defaultVal);
+    uint64_t resize(uint64_t newNumElements, std::span<std::byte> defaultVal);
 
     virtual inline void checkpointInMemoryIfNecessary() {
         std::unique_lock xlock{this->diskArraySharedMtx};
@@ -170,7 +170,7 @@ public:
 
         WriteIterator& seek(size_t newIdx);
         // Adds a new element to the disk array and seeks to the new element
-        void pushBack(std::span<uint8_t> val);
+        void pushBack(std::span<std::byte> val);
 
         inline WriteIterator& operator+=(size_t increment) { return seek(idx + increment); }
 
@@ -199,7 +199,7 @@ protected:
 
     void updateLastPageOnDisk();
 
-    uint64_t pushBackNoLock(std::span<uint8_t> val);
+    uint64_t pushBackNoLock(std::span<std::byte> val);
 
     inline uint64_t getNumElementsNoLock(transaction::TransactionType trxType) {
         return getDiskArrayHeader(trxType).numElements;
@@ -261,8 +261,8 @@ protected:
 };
 
 template<typename U>
-inline std::span<uint8_t> getSpan(U& val) {
-    return std::span(reinterpret_cast<uint8_t*>(&val), sizeof(U));
+inline std::span<std::byte> getSpan(U& val) {
+    return std::span(reinterpret_cast<std::byte*>(&val), sizeof(U));
 }
 
 template<typename U>
@@ -364,14 +364,14 @@ private:
     DiskArrayInternal diskArray;
 };
 
-class InMemDiskArrayBuilderInternal {
+class BlockVectorInternal {
 public:
-    InMemDiskArrayBuilderInternal(uint64_t numElements, size_t elementSize, bool setToZero = false);
+    BlockVectorInternal(size_t elementSize) : header{elementSize} {}
 
     // This function is designed to be used during building of a disk array, i.e., during loading.
     // In particular, it changes the needed capacity non-transactionally, i.e., without writing
     // anything to the wal.
-    void resize(uint64_t newNumElements, bool setToZero);
+    void resize(uint64_t newNumElements, std::span<std::byte> defaultVal);
 
     inline uint64_t size() const { return header.numElements; }
 
@@ -406,24 +406,25 @@ protected:
 };
 
 template<typename U>
-class InMemDiskArrayBuilder {
+class BlockVector {
 public:
-    InMemDiskArrayBuilder(uint64_t numElements = 0) : diskArray(numElements, sizeof(U), true) {}
+    explicit BlockVector(uint64_t numElements = 0) : vector(sizeof(U)) { resize(numElements); }
 
-    inline U& operator[](uint64_t idx) { return *(U*)diskArray[idx]; }
+    inline U& operator[](uint64_t idx) { return *(U*)vector[idx]; }
 
-    inline void resize(uint64_t newNumElements, bool setToZero) {
-        diskArray.resize(newNumElements, setToZero);
+    inline void resize(uint64_t newNumElements) {
+        U defaultVal;
+        vector.resize(newNumElements, getSpan(defaultVal));
     }
 
-    inline uint64_t size() const { return diskArray.size(); }
+    inline uint64_t size() const { return vector.size(); }
 
     static constexpr uint32_t getAlignedElementSize() {
         return DiskArray<U>::getAlignedElementSize();
     }
 
 private:
-    InMemDiskArrayBuilderInternal diskArray;
+    BlockVectorInternal vector;
 };
 
 } // namespace storage

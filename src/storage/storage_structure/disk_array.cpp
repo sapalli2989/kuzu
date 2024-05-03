@@ -108,7 +108,7 @@ bool DiskArrayInternal::checkOutOfBoundAccess(TransactionType trxType, uint64_t 
     return true;
 }
 
-void DiskArrayInternal::get(uint64_t idx, TransactionType trxType, std::span<uint8_t> val) {
+void DiskArrayInternal::get(uint64_t idx, TransactionType trxType, std::span<std::byte> val) {
     std::shared_lock sLck{diskArraySharedMtx};
     KU_ASSERT(checkOutOfBoundAccess(trxType, idx));
     auto apCursor = getAPIdxAndOffsetInAP(header, idx);
@@ -149,7 +149,7 @@ void DiskArrayInternal::updatePage(uint64_t pageIdx, bool isNewPage,
     }
 }
 
-void DiskArrayInternal::update(uint64_t idx, std::span<uint8_t> val) {
+void DiskArrayInternal::update(uint64_t idx, std::span<std::byte> val) {
     std::unique_lock xLck{diskArraySharedMtx};
     hasTransactionalUpdates = true;
     KU_ASSERT(checkOutOfBoundAccess(TransactionType::WRITE, idx));
@@ -169,7 +169,7 @@ void DiskArrayInternal::update(uint64_t idx, std::span<uint8_t> val) {
     });
 }
 
-uint64_t DiskArrayInternal::pushBack(std::span<uint8_t> val) {
+uint64_t DiskArrayInternal::pushBack(std::span<std::byte> val) {
     std::unique_lock xLck{diskArraySharedMtx};
     auto it = iter_mut(val.size());
     auto originalNumElements = getNumElementsNoLock(TransactionType::WRITE);
@@ -177,7 +177,7 @@ uint64_t DiskArrayInternal::pushBack(std::span<uint8_t> val) {
     return originalNumElements;
 }
 
-uint64_t DiskArrayInternal::resize(uint64_t newNumElements, std::span<uint8_t> defaultVal) {
+uint64_t DiskArrayInternal::resize(uint64_t newNumElements, std::span<std::byte> defaultVal) {
     std::unique_lock xLck{diskArraySharedMtx};
     auto it = iter_mut(defaultVal.size());
     auto originalNumElements = getNumElementsNoLock(TransactionType::WRITE);
@@ -362,7 +362,7 @@ DiskArrayInternal::WriteIterator& DiskArrayInternal::WriteIterator::seek(size_t 
     return *this;
 }
 
-void DiskArrayInternal::WriteIterator::pushBack(std::span<uint8_t> val) {
+void DiskArrayInternal::WriteIterator::pushBack(std::span<std::byte> val) {
     idx = diskArray.headerForWriteTrx.numElements++;
     auto oldPageIdx = apCursor.pageIdx;
     apCursor = getAPIdxAndOffsetInAP(diskArray.header, idx);
@@ -418,33 +418,26 @@ common::page_idx_t DiskArrayInternal::getAPIdx(uint64_t idx) const {
 
 // [] operator to be used when building an InMemDiskArrayBuilder without transactional updates.
 // This changes the contents directly in memory and not on disk (nor on the wal)
-uint8_t* InMemDiskArrayBuilderInternal::operator[](uint64_t idx) {
+uint8_t* BlockVectorInternal::operator[](uint64_t idx) {
     auto apCursor = getAPIdxAndOffsetInAP(header, idx);
     KU_ASSERT(apCursor.pageIdx < this->header.numAPs);
     return inMemArrayPages[apCursor.pageIdx].get() + apCursor.elemPosInPage;
 }
 
-InMemDiskArrayBuilderInternal::InMemDiskArrayBuilderInternal(uint64_t numElements,
-    size_t elementSize, bool setToZero)
-    : header{elementSize} {
-
-    setNumElementsAndAllocateDiskAPsForBuilding(numElements);
-    for (uint64_t i = 0; i < this->header.numAPs; ++i) {
-        this->addInMemoryArrayPage(setToZero);
-    }
-}
-
-void InMemDiskArrayBuilderInternal::resize(uint64_t newNumElements, bool setToZero) {
+void BlockVectorInternal::resize(uint64_t newNumElements, std::span<std::byte> defaultVal) {
     uint64_t oldNumAPs = this->header.numAPs;
+    auto oldNumElements = header.numElements;
     setNumElementsAndAllocateDiskAPsForBuilding(newNumElements);
     uint64_t newNumAPs = this->header.numAPs;
     for (auto i = oldNumAPs; i < newNumAPs; ++i) {
-        this->addInMemoryArrayPage(setToZero);
+        this->addInMemoryArrayPage(true /*setToZero*/);
+    }
+    for (uint64_t i = 0; i < newNumElements - oldNumElements; i++) {
+        memcpy(operator[](oldNumElements + i), defaultVal.data(), defaultVal.size());
     }
 }
 
-void InMemDiskArrayBuilderInternal::setNumElementsAndAllocateDiskAPsForBuilding(
-    uint64_t newNumElements) {
+void BlockVectorInternal::setNumElementsAndAllocateDiskAPsForBuilding(uint64_t newNumElements) {
     uint64_t oldNumArrayPages = this->header.numAPs;
     uint64_t newNumArrayPages = getNumArrayPagesNeededForElements(newNumElements);
     for (auto i = oldNumArrayPages; i < newNumArrayPages; ++i) {

@@ -23,9 +23,8 @@ namespace storage {
 
 template<typename T>
 InMemHashIndex<T>::InMemHashIndex(OverflowFileHandle* overflowFileHandle)
-    : overflowFileHandle(overflowFileHandle),
-      pSlots{std::make_unique<InMemDiskArrayBuilder<Slot<T>>>()},
-      oSlots{std::make_unique<InMemDiskArrayBuilder<Slot<T>>>()},
+    : overflowFileHandle(overflowFileHandle), pSlots{std::make_unique<BlockVector<Slot<T>>>()},
+      oSlots{std::make_unique<BlockVector<Slot<T>>>()},
       indexHeader{TypeUtils::getPhysicalTypeIDForType<T>()} {
     // Match HashIndex in allocating at least one page of slots so that we don't split within the
     // same page
@@ -35,8 +34,8 @@ InMemHashIndex<T>::InMemHashIndex(OverflowFileHandle* overflowFileHandle)
 template<typename T>
 void InMemHashIndex<T>::clear() {
     indexHeader = HashIndexHeader(TypeUtils::getPhysicalTypeIDForType<T>());
-    pSlots = std::make_unique<InMemDiskArrayBuilder<Slot<T>>>();
-    oSlots = std::make_unique<InMemDiskArrayBuilder<Slot<T>>>();
+    pSlots = std::make_unique<BlockVector<Slot<T>>>();
+    oSlots = std::make_unique<BlockVector<Slot<T>>>();
     allocateSlots(BufferPoolConstants::PAGE_4KB_SIZE / pSlots->getAlignedElementSize());
 }
 
@@ -263,11 +262,7 @@ template<typename T>
 uint32_t InMemHashIndex<T>::allocatePSlots(uint32_t numSlotsToAllocate) {
     auto oldNumSlots = pSlots->size();
     auto newNumSlots = oldNumSlots + numSlotsToAllocate;
-    pSlots->resize(newNumSlots, true /*setToZero*/);
-    // TODO: resize should value-initialize
-    for (size_t i = 0; i < numSlotsToAllocate; i++) {
-        (*pSlots)[oldNumSlots + i] = Slot<T>();
-    }
+    pSlots->resize(newNumSlots);
     return oldNumSlots;
 }
 
@@ -276,8 +271,7 @@ uint32_t InMemHashIndex<T>::allocateAOSlot() {
     if (indexHeader.firstFreeOverflowSlotId == SlotHeader::INVALID_OVERFLOW_SLOT_ID) {
         auto oldNumSlots = oSlots->size();
         auto newNumSlots = oldNumSlots + 1;
-        oSlots->resize(newNumSlots, true /*setToZero*/);
-        (*oSlots)[oldNumSlots] = Slot<T>();
+        oSlots->resize(newNumSlots);
         return oldNumSlots;
     } else {
         auto freeOSlotId = indexHeader.firstFreeOverflowSlotId;
