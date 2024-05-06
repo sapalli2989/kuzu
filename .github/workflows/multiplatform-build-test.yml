@@ -338,7 +338,14 @@ jobs:
   debian-ubuntu-build-test:
     strategy:
       matrix:
-        image: ["ubuntu:23.04", "ubuntu:23.10", "debian:12", "debian:sid"]
+        image:
+          [
+            "ubuntu:22.04",
+            "ubuntu:23.10",
+            "ubuntu:24.04",
+            "debian:12",
+            "debian:sid",
+          ]
       fail-fast: false
     name: ${{ matrix.image }}
     runs-on: ubuntu-latest
@@ -363,11 +370,19 @@ jobs:
       - uses: actions/checkout@v3
         continue-on-error: true
 
-      - name: Ensure Python dependencies
+      - name: Ensure Python dependencies (Python <= 3.10)
         continue-on-error: true
+        if: ${{ matrix.image == 'debian:11' || matrix.image == 'ubuntu:22.04'}}
         run: |
-          pip install torch~=2.0.0 --extra-index-url https://download.pytorch.org/whl/cpu ${{ matrix.image != 'debian:11' && '--break-system-packages' || '' }}
-          pip install --user -r tools/python_api/requirements_dev.txt -f https://data.pyg.org/whl/torch-2.0.0+cpu.html ${{ matrix.image != 'debian:11' && '--break-system-packages' || '' }}
+          pip install torch~=2.0.0 --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install --user -r tools/python_api/requirements_dev.txt -f https://data.pyg.org/whl/torch-2.0.0+cpu.html
+
+      - name: Ensure Python dependencies (Python >= 3.11)
+        continue-on-error: true
+        if: ${{ matrix.image == 'debian:sid' || matrix.image == 'ubuntu:23.10' || matrix.image == 'ubuntu:24.04'}}
+        run: |
+          pip install torch~=2.2.1 --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install --user -r tools/python_api/requirements_dev.txt -f https://data.pyg.org/whl/torch-2.2.1+cpu.html
 
       - name: Ensure Node.js dependencies
         working-directory: tools/nodejs_api
@@ -452,7 +467,7 @@ jobs:
           name: ${{env.PLATFORM}}
           path: ${{env.PLATFORM}}.csv
 
-  rhel-fedora-build-test: 
+  rhel-fedora-build-test:
     strategy:
       matrix:
         image: ["rockylinux:8", "rockylinux:9", "fedora:38", "fedora:39"]
