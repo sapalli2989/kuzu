@@ -234,7 +234,7 @@ class Connection:
         self,
         name: str,
         udf: Callable[[...], Any],
-        params_type: list[Type | str] = [],
+        params_type: list[Type | str] | None = None,
         return_type: Type | str = ""
     ) -> None:
         """
@@ -254,6 +254,8 @@ class Connection:
         return_type: Optional[Type]
             a Type enum to describe the returned value
         """
+        if params_type is None:
+            params_type = []
         parsed_params_type = [x if type(x) is str else x.value for x in params_type]
         if (type(return_type) is not str):
             return_type = return_type.value
