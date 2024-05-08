@@ -121,6 +121,12 @@ public:
         commitUDFTrx(autoTrx);
     }
 
+    void removeUDFFunction(std::string name) {
+        auto autoTrx = startUDFAutoTrx(clientContext->getTransactionContext());
+        removeScalarFunction(std::move(name));
+        commitUDFTrx(autoTrx);
+    }
+
     template<typename TR, typename... Args>
     void createVectorizedFunction(std::string name, function::scalar_func_exec_t scalarFunc) {
         auto autoTrx = startUDFAutoTrx(clientContext->getTransactionContext());
@@ -169,6 +175,7 @@ private:
         PreparedStatement* preparedStatement, uint32_t planIdx = 0u);
 
     KUZU_API void addScalarFunction(std::string name, function::function_set definitions);
+    KUZU_API void removeScalarFunction(std::string name);
 
     KUZU_API bool startUDFAutoTrx(transaction::TransactionContext* trx);
     KUZU_API void commitUDFTrx(bool isAutoCommitTrx);

@@ -57,6 +57,7 @@ private:
     }
     void addFunction(CatalogEntryType entryType, std::string name,
         function::function_set definitions);
+    void removeFunction(std::string name);
 
     function::ScalarMacroFunction* getScalarMacroFunction(const std::string& name) const;
 

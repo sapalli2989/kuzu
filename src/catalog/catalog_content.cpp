@@ -252,6 +252,13 @@ void CatalogContent::addFunction(CatalogEntryType entryType, std::string name,
         std::make_unique<FunctionCatalogEntry>(entryType, std::move(name), std::move(definitions)));
 }
 
+void CatalogContent::removeFunction(std::string name) {
+    if (!functions->containsEntry(name)) {
+        throw CatalogException{stringFormat("function {} does not exist.", name)};
+    }
+    functions->removeEntry(name);
+}
+
 function::ScalarMacroFunction* CatalogContent::getScalarMacroFunction(
     const std::string& name) const {
     return functions->getEntry(name)->constPtrCast<ScalarMacroCatalogEntry>()->getMacroFunction();

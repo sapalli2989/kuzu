@@ -470,6 +470,10 @@ void ClientContext::addScalarFunction(std::string name, function::function_set d
         std::move(definitions));
 }
 
+void ClientContext::removeScalarFunction(std::string name) {
+    database->catalog->removeFunction(std::move(name));
+}
+
 bool ClientContext::startUDFAutoTrx(transaction::TransactionContext* trx) {
     if (!trx->hasActiveTransaction()) {
         auto res = query("BEGIN TRANSACTION");

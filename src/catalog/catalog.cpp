@@ -243,6 +243,14 @@ void Catalog::addFunction(CatalogEntryType entryType, std::string name,
     readWriteVersion->addFunction(entryType, std::move(name), std::move(functionSet));
 }
 
+void Catalog::removeFunction(std::string name) {
+    initCatalogContentForWriteTrxIfNecessary();
+    KU_ASSERT(readWriteVersion != nullptr);
+    setToUpdated();
+    readWriteVersion->removeFunction(std::move(name));
+
+}
+
 void Catalog::addBuiltInFunction(CatalogEntryType entryType, std::string name,
     function::function_set functionSet) {
     readOnlyVersion->addFunction(entryType, std::move(name), std::move(functionSet));

@@ -61,6 +61,7 @@ public:
     // ----------------------------- Functions ----------------------------
     void addFunction(CatalogEntryType entryType, std::string name,
         function::function_set functionSet);
+    void removeFunction(std::string name);
     void addBuiltInFunction(CatalogEntryType entryType, std::string name,
         function::function_set functionSet);
     CatalogSet* getFunctions(transaction::Transaction* tx) const;

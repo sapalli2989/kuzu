@@ -110,7 +110,8 @@ static PyUDFSignature analyzeSignature(const py::function& udf) {
     return UDFSignature;
 }
 
-static scalar_func_exec_t getUDFExecFunc(const py::function& udf) {
+static scalar_func_exec_t getUDFExecFunc(const py::function& udf, bool defaultNull,
+    bool catchExceptions) {
     return [=](const std::vector<std::shared_ptr<ValueVector>>& params, ValueVector& result,
                void* /* dataPtr */) -> void {
         py::gil_scoped_acquire acquire;
@@ -118,17 +119,33 @@ static scalar_func_exec_t getUDFExecFunc(const py::function& udf) {
         for (auto i = 0u; i < result.state->selVector->selectedSize; ++i) {
             auto resultPos = result.state->selVector->selectedPositions[i];
             py::list pyParams;
+            bool hasNull = false;
             for (const auto& param : params) {
                 auto paramPos = param->state->isFlat() ?
                                     param->state->selVector->selectedPositions[0] :
                                     resultPos;
                 auto value = param->getAsValue(paramPos);
+                if (value->isNull()) {
+                    hasNull = true;
+                }
                 auto pyValue = PyQueryResult::convertValueToPyObject(*value);
                 pyParams.append(pyValue);
             }
-            auto pyResult = udf(*pyParams);
-            auto resultValue = PyConnection::transformPythonValueAs(pyResult, result.dataType);
-            result.copyFromValue(resultPos, resultValue);
+            if (defaultNull && hasNull) {
+                result.setNull(resultPos, true);
+            } else {
+                try {
+                    auto pyResult = udf(*pyParams);
+                    auto resultValue = PyConnection::transformPythonValueAs(pyResult, result.dataType);
+                    result.copyFromValue(resultPos, resultValue);
+                } catch (py::error_already_set &e) {
+                    if (catchExceptions) {
+                        result.setNull(resultPos, true);
+                    } else {
+                        throw;
+                    }
+                }
+            }
         }
     };
 }
@@ -141,7 +158,8 @@ static scalar_bind_func getUDFBindFunc(const PyUDFSignature& signature) {
 }
 
 function_set PyUDF::toFunctionSet(const std::string& name, const py::function& udf,
-    const py::list& paramTypes, const std::string& resultType) {
+    const py::list& paramTypes, const std::string& resultType, bool defaultNull,
+    bool catchExceptions) {
     auto pySignature = analyzeSignature(udf);
     auto explicitParamTypes = pyListToParams(paramTypes);
     if (explicitParamTypes.size() > 0) {
@@ -169,7 +187,8 @@ function_set PyUDF::toFunctionSet(const std::string& name, const py::function& u
 
     function_set definitions;
     definitions.push_back(std::make_unique<ScalarFunction>(name, paramIDTypes,
-        pySignature.resultType.getLogicalTypeID(), getUDFExecFunc(udf),
+        pySignature.resultType.getLogicalTypeID(),
+        getUDFExecFunc(udf, defaultNull, catchExceptions),
         getUDFBindFunc(pySignature)));
     return definitions;
 }
