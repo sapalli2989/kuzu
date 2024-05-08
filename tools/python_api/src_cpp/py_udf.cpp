@@ -134,8 +134,7 @@ static scalar_func_exec_t getUDFExecFunc(const py::function& udf) {
 }
 
 static scalar_bind_func getUDFBindFunc(const PyUDFSignature& signature) {
-    return [=](const binder::expression_vector&,
-               Function*) -> std::unique_ptr<FunctionBindData> {
+    return [=](const binder::expression_vector&, Function*) -> std::unique_ptr<FunctionBindData> {
         return std::make_unique<FunctionBindData>(signature.paramTypes,
             std::make_unique<LogicalType>(signature.resultType));
     };
