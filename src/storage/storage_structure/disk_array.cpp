@@ -58,8 +58,8 @@ DiskArrayInternal::DiskArrayInternal(FileHandle& fileHandle, page_idx_t headerPa
 
 DiskArrayInternal::DiskArrayInternal(FileHandle& fileHandle, DBFileID dbFileID,
     page_idx_t headerPageIdx, BufferManager* bufferManager, WAL* wal,
-    transaction::Transaction* transaction, bool bypassWAL)
-    : fileHandle{fileHandle}, dbFileID{dbFileID}, headerPageIdx{headerPageIdx},
+    transaction::Transaction* transaction, uint64_t elementSize, bool bypassWAL)
+    : header{elementSize}, fileHandle{fileHandle}, dbFileID{dbFileID}, headerPageIdx{headerPageIdx},
       hasTransactionalUpdates{false}, bufferManager{bufferManager}, wal{wal},
       lastAPPageIdx{INVALID_PAGE_IDX}, lastPageOnDisk{INVALID_PAGE_IDX} {
     auto [fileHandleToPin, pageIdxToPin] = DBFileUtils::getFileHandleAndPhysicalPageIdxToPin(
@@ -272,23 +272,22 @@ void DiskArrayInternal::checkpointOrRollbackInMemoryIfNecessaryNoLock(bool isChe
 
 void DiskArrayInternal::prepareCommit() {
     auto& bmFileHandle = ku_dynamic_cast<FileHandle&, BMFileHandle&>(fileHandle);
-    // Update header if it has changed
     if (headerForWriteTrx != header) {
         DBFileUtils::updatePage(bmFileHandle, dbFileID, headerPageIdx,
-            false /* not inserting a new page */, *bufferManager, *wal,
-            [&](uint8_t* frame) -> void {
+            true /*no other data on this page*/, *bufferManager, *wal, [&](uint8_t* frame) -> void {
                 memcpy(frame, &headerForWriteTrx, sizeof(headerForWriteTrx));
             });
     }
     if (pipUpdates.updatedLastPIP.has_value()) {
-        DBFileUtils::updatePage(bmFileHandle, dbFileID, pipUpdates.updatedLastPIP->pipPageIdx, true,
-            *bufferManager, *wal, [&](auto* frame) {
+        DBFileUtils::updatePage(bmFileHandle, dbFileID, pipUpdates.updatedLastPIP->pipPageIdx,
+            true /*writing entire page*/, *bufferManager, *wal, [&](auto* frame) {
                 memcpy(frame, &pipUpdates.updatedLastPIP->pipContents, sizeof(PIP));
             });
     }
     for (auto& newPIP : pipUpdates.newPIPs) {
-        DBFileUtils::updatePage(bmFileHandle, dbFileID, newPIP.pipPageIdx, true, *bufferManager,
-            *wal, [&](auto* frame) { memcpy(frame, &newPIP.pipContents, sizeof(PIP)); });
+        DBFileUtils::updatePage(bmFileHandle, dbFileID, newPIP.pipPageIdx,
+            true /*writing entire page*/, *bufferManager, *wal,
+            [&](auto* frame) { memcpy(frame, &newPIP.pipContents, sizeof(PIP)); });
     }
 }
 
