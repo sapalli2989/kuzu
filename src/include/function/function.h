@@ -25,6 +25,11 @@ struct FunctionBindData {
 
     virtual ~FunctionBindData() = default;
 
+    template<class TARGET>
+    TARGET* ptrCast() {
+        return common::ku_dynamic_cast<FunctionBindData*, TARGET*>(this);
+    }
+
     static std::unique_ptr<FunctionBindData> getSimpleBindData(
         const binder::expression_vector& params, const common::LogicalType& resultType);
 };

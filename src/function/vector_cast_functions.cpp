@@ -19,13 +19,14 @@ namespace function {
 struct CastChildFunctionExecutor {
     template<typename OPERAND_TYPE, typename RESULT_TYPE, typename FUNC, typename OP_WRAPPER>
     static void executeSwitch(common::ValueVector& operand, common::ValueVector& result,
-        void* dataPtr) {
-        auto numOfEntries = reinterpret_cast<CastFunctionBindData*>(dataPtr)->numOfEntries;
+        FunctionBindData* bindData) {
+        auto castBindData = bindData->ptrCast<CastFunctionBindData>();
+        auto numOfEntries = bindData->ptrCast<CastFunctionBindData>()->numOfEntries;
         for (auto i = 0u; i < numOfEntries; i++) {
             result.setNull(i, operand.isNull(i));
             if (!result.isNull(i)) {
                 OP_WRAPPER::template operation<OPERAND_TYPE, RESULT_TYPE, FUNC>((void*)(&operand),
-                    i, (void*)(&result), i, dataPtr);
+                    i, (void*)(&result), i, castBindData);
             }
         }
     }
@@ -92,7 +93,7 @@ static void resolveNestedVector(std::shared_ptr<ValueVector> inputVector, ValueV
                         ->execFunc;
         std::vector<std::shared_ptr<ValueVector>> childParams{inputVector};
         dataPtr->numOfEntries = numOfEntries;
-        func(childParams, *resultVector, (void*)dataPtr);
+        func(childParams, *resultVector, dataPtr);
     } else {
         for (auto i = 0u; i < numOfEntries; i++) {
             resultVector->copyFromVectorData(i, inputVector.get(), i);

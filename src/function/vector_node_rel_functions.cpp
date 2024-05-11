@@ -13,7 +13,7 @@ namespace function {
 static void OffsetExecFunc(const std::vector<std::shared_ptr<ValueVector>>& params,
     ValueVector& result, void* /*dataPtr*/ = nullptr) {
     KU_ASSERT(params.size() == 1);
-    UnaryFunctionExecutor::execute<internalID_t, int64_t, Offset>(*params[0], result);
+    ScalarFunction::UnaryExecFunction<internalID_t, int64_t, Offset>(params, result, nullptr);
 }
 
 function_set OffsetFunction::getFunctionSet() {

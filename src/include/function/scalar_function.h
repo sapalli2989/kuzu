@@ -17,7 +17,7 @@ using scalar_func_compile_exec_t =
         std::shared_ptr<common::ValueVector>&)>;
 // Execute function.
 using scalar_func_exec_t = std::function<void(
-    const std::vector<std::shared_ptr<common::ValueVector>>&, common::ValueVector&, void*)>;
+    const std::vector<std::shared_ptr<common::ValueVector>>&, common::ValueVector&, FunctionBindData*)>;
 // Execute boolean function and write result to selection vector. Fast path for filter.
 using scalar_func_select_t = std::function<bool(
     const std::vector<std::shared_ptr<common::ValueVector>>&, common::SelectionVector&)>;
@@ -109,10 +109,10 @@ struct ScalarFunction final : public BaseScalarFunction {
     template<typename OPERAND_TYPE, typename RESULT_TYPE, typename FUNC,
         typename EXECUTOR = UnaryFunctionExecutor>
     static void UnaryExecFunction(const std::vector<std::shared_ptr<common::ValueVector>>& params,
-        common::ValueVector& result, void* dataPtr) {
+        common::ValueVector& result, FunctionBindData* bindData) {
         KU_ASSERT(params.size() == 1);
         EXECUTOR::template executeSwitch<OPERAND_TYPE, RESULT_TYPE, FUNC, UnaryFunctionWrapper>(
-            *params[0], result, dataPtr);
+            *params[0], result, bindData);
     }
 
     template<typename OPERAND_TYPE, typename RESULT_TYPE, typename FUNC>
@@ -128,20 +128,20 @@ struct ScalarFunction final : public BaseScalarFunction {
         typename EXECUTOR = UnaryFunctionExecutor>
     static void UnaryCastStringExecFunction(
         const std::vector<std::shared_ptr<common::ValueVector>>& params,
-        common::ValueVector& result, void* dataPtr) {
+        common::ValueVector& result, FunctionBindData* bindData) {
         KU_ASSERT(params.size() == 1);
         EXECUTOR::template executeSwitch<OPERAND_TYPE, RESULT_TYPE, FUNC,
-            UnaryCastStringFunctionWrapper>(*params[0], result, dataPtr);
+            UnaryCastStringFunctionWrapper>(*params[0], result, bindData);
     }
 
     template<typename OPERAND_TYPE, typename RESULT_TYPE, typename FUNC,
         typename EXECUTOR = UnaryFunctionExecutor>
     static void UnaryCastExecFunction(
         const std::vector<std::shared_ptr<common::ValueVector>>& params,
-        common::ValueVector& result, void* dataPtr) {
+        common::ValueVector& result, FunctionBindData* bindData) {
         KU_ASSERT(params.size() == 1);
         EXECUTOR::template executeSwitch<OPERAND_TYPE, RESULT_TYPE, FUNC, UnaryCastFunctionWrapper>(
-            *params[0], result, dataPtr);
+            *params[0], result, bindData);
     }
 
     template<typename OPERAND_TYPE, typename RESULT_TYPE, typename FUNC,
