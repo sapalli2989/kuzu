@@ -4,8 +4,13 @@
 namespace kuzu {
 namespace function {
 
+struct ShortestPathExtraBindData final : public AlgoFuncExtraBindData {
+
+};
+
 function_set ShortestPathFunction::getFunctionSet() {
     function_set result;
+
     return result;
 }
 
