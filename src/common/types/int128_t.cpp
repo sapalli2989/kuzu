@@ -639,6 +639,40 @@ int128_t::operator int8_t() const {
     return NarrowCast<int8_t>(*this);
 }
 
+int128_t::operator uint64_t() const {
+    return NarrowCast<uint64_t>(*this);
+}
+
+int128_t::operator uint32_t() const {
+    return NarrowCast<uint32_t>(*this);
+}
+
+int128_t::operator uint16_t() const {
+    return NarrowCast<uint16_t>(*this);
+}
+
+int128_t::operator uint8_t() const {
+    return NarrowCast<uint8_t>(*this);
+}
+
+int128_t::operator double() const {
+    double result;
+    if (!Int128_t::tryCast(*this, result)) { // LCOV_EXCL_START
+        throw common::OverflowException{common::stringFormat("Value {} is not within DOUBLE range",
+            common::TypeUtils::toString(*this))};
+    } // LCOV_EXCL_STOP
+    return result;
+}
+
+int128_t::operator float() const {
+    float result;
+    if (!Int128_t::tryCast(*this, result)) { // LCOV_EXCL_START
+        throw common::OverflowException{common::stringFormat("Value {} is not within FLOAT range",
+            common::TypeUtils::toString(*this))};
+    } // LCOV_EXCL_STOP
+    return result;
+}
+
 } // namespace kuzu::common
 
 std::size_t std::hash<kuzu::common::int128_t>::operator()(

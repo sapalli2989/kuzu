@@ -351,6 +351,12 @@ public:
             numElements);
     }
 
+    static LogicalType makeLogicalTypeUnsafe(LogicalTypeID typeID) {
+        LogicalType ret;
+        ret.typeID = typeID;
+        return ret;
+    }
+
 private:
     friend struct CAPIHelper;
     friend struct JavaAPIHelper;
@@ -392,7 +398,7 @@ public:
     uint32_t getPrecision() const { return precision; }
     uint32_t getScale() const { return scale; }
 
-    bool containsAny() const override { return true; }
+    bool containsAny() const override { return false; }
 
     bool operator==(const ExtraTypeInfo& other) const override;
 

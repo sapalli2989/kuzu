@@ -5,6 +5,8 @@
 
 #include "common/types/int128_t.h"
 
+using namespace kuzu::common;
+
 namespace kuzu {
 namespace function {
 
@@ -17,17 +19,19 @@ struct NumericLimits {
 };
 
 template<>
-struct NumericLimits<common::int128_t> {
-    static constexpr common::int128_t minimum() {
+struct NumericLimits<int128_t> {
+    static constexpr int128_t minimum() {
         return {static_cast<uint64_t>(std::numeric_limits<int64_t>::lowest()), 1};
     }
-    static constexpr common::int128_t maximum() {
+    static constexpr int128_t maximum() {
         return {std::numeric_limits<int64_t>::max(),
             static_cast<int64_t>(std::numeric_limits<uint64_t>::max())};
     }
     static constexpr bool isSigned() { return true; }
     static constexpr uint64_t digits() { return 39; }
 };
+
+constexpr auto DECIMAL_PRECISION_LIMIT = 38;
 
 template<>
 constexpr uint64_t NumericLimits<int8_t>::digits() {
@@ -77,6 +81,61 @@ constexpr uint64_t NumericLimits<float>::digits() {
 template<>
 constexpr uint64_t NumericLimits<double>::digits() {
     return 250;
+}
+
+template<typename T>
+static constexpr std::array<T, NumericLimits<T>::digits()> pow10Sequence() {
+    std::array<T, NumericLimits<T>::digits()> retval;
+    retval[0] = 1;
+    for (auto i = 1u; i < NumericLimits<T>::digits(); i++) {
+        retval[i] = retval[i-1] * 10;
+    }
+    return retval;
+}
+
+template<>
+constexpr std::array<int128_t, NumericLimits<int128_t>::digits()> pow10Sequence() {
+    return {
+        int128_t(1UL, 0LL),
+		int128_t(10UL, 0LL),
+		int128_t(100UL, 0LL),
+		int128_t(1000UL, 0LL),
+		int128_t(10000UL, 0LL),
+		int128_t(100000UL, 0LL),
+		int128_t(1000000UL, 0LL),
+		int128_t(10000000UL, 0LL),
+		int128_t(100000000UL, 0LL),
+		int128_t(1000000000UL, 0LL),
+		int128_t(10000000000UL, 0LL),
+		int128_t(100000000000UL, 0LL),
+		int128_t(1000000000000UL, 0LL),
+		int128_t(10000000000000UL, 0LL),
+		int128_t(100000000000000UL, 0LL),
+		int128_t(1000000000000000UL, 0LL),
+		int128_t(10000000000000000UL, 0LL),
+		int128_t(100000000000000000UL, 0LL),
+		int128_t(1000000000000000000UL, 0LL),
+		int128_t(10000000000000000000UL, 0LL),
+		int128_t(7766279631452241920UL, 5LL),
+		int128_t(3875820019684212736UL, 54LL),
+		int128_t(1864712049423024128UL, 542LL),
+		int128_t(200376420520689664UL, 5421LL),
+		int128_t(2003764205206896640UL, 54210LL),
+		int128_t(1590897978359414784UL, 542101LL),
+		int128_t(15908979783594147840UL, 5421010LL),
+		int128_t(11515845246265065472UL, 54210108LL),
+		int128_t(4477988020393345024UL, 542101086LL),
+		int128_t(7886392056514347008UL, 5421010862LL),
+		int128_t(5076944270305263616UL, 54210108624LL),
+		int128_t(13875954555633532928UL, 542101086242LL),
+		int128_t(9632337040368467968UL, 5421010862427LL),
+		int128_t(4089650035136921600UL, 54210108624275LL),
+		int128_t(4003012203950112768UL, 542101086242752LL),
+		int128_t(3136633892082024448UL, 5421010862427522LL),
+		int128_t(12919594847110692864UL, 54210108624275221LL),
+		int128_t(68739955140067328UL, 542101086242752217LL),
+        int128_t(687399551400673280UL, 5421010862427522170LL),
+    }; // Couldn't find a clean way to do this
 }
 
 } // namespace function

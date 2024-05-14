@@ -12,6 +12,7 @@
 #include "function/arithmetic/multiply.h"
 #include "function/arithmetic/negate.h"
 #include "function/arithmetic/subtract.h"
+#include "function/decimal/vector_decimal_functions.h"
 #include "function/list/functions/list_concat_function.h"
 #include "function/list/vector_list_functions.h"
 #include "function/scalar_function.h"
@@ -146,6 +147,10 @@ function_set AddFunction::getFunctionSet() {
         result.push_back(getBinaryFunction<Add>(name, typeID));
     }
 
+    // decimal + decimal -> decimal
+    result.push_back(std::make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL, LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindAddFunc));
     // list + list -> list
     result.push_back(std::make_unique<ScalarFunction>(name,
         std::vector<LogicalTypeID>{LogicalTypeID::LIST, LogicalTypeID::LIST}, LogicalTypeID::LIST,
@@ -193,6 +198,10 @@ function_set SubtractFunction::getFunctionSet() {
     for (auto typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getBinaryFunction<Subtract>(name, typeID));
     }
+    // decimal - decimal -> decimal
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL, LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindSubtractFunc));
     // date - date → int64
     result.push_back(getBinaryFunction<Subtract, date_t, int64_t>(name, LogicalTypeID::DATE,
         LogicalTypeID::INT64));
@@ -224,6 +233,10 @@ function_set MultiplyFunction::getFunctionSet() {
     for (auto typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getBinaryFunction<Multiply>(name, typeID));
     }
+    // decimal * decimal -> decimal
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL, LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindMultiplyFunc));
     return result;
 }
 
@@ -237,6 +250,10 @@ function_set DivideFunction::getFunctionSet() {
         std::vector<LogicalTypeID>{LogicalTypeID::INTERVAL, LogicalTypeID::INT64},
         LogicalTypeID::INTERVAL,
         ScalarFunction::BinaryExecFunction<interval_t, int64_t, interval_t, Divide>));
+    // decimal / decimal -> decimal
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL, LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindDivideFunc));
     return result;
 }
 
@@ -245,6 +262,10 @@ function_set ModuloFunction::getFunctionSet() {
     for (auto typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getBinaryFunction<Modulo>(name, typeID));
     }
+    // decimal % decimal -> decimal
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL, LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindModuloFunc));
     return result;
 }
 
@@ -261,6 +282,10 @@ function_set NegateFunction::getFunctionSet() {
     for (auto& typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getUnaryFunction<Negate>(name, typeID));
     }
+    // floor(decimal) -> decimal
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindNegateFunc));
     return result;
 }
 
@@ -269,6 +294,9 @@ function_set AbsFunction::getFunctionSet() {
     for (auto& typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getUnaryFunction<Abs>(name, typeID));
     }
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindAbsFunc));
     return result;
 }
 
@@ -277,6 +305,9 @@ function_set FloorFunction::getFunctionSet() {
     for (auto& typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getUnaryFunction<Floor>(name, typeID));
     }
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindFloorFunc));
     return result;
 }
 
@@ -285,6 +316,9 @@ function_set CeilFunction::getFunctionSet() {
     for (auto& typeID : LogicalTypeUtils::getNumericalLogicalTypeIDs()) {
         result.push_back(getUnaryFunction<Ceil>(name, typeID));
     }
+    result.push_back(make_unique<ScalarFunction>(name,
+        std::vector<LogicalTypeID>{LogicalTypeID::DECIMAL}, LogicalTypeID::DECIMAL,
+        nullptr, nullptr, DecimalFunction::bindCeilFunc));
     return result;
 }
 

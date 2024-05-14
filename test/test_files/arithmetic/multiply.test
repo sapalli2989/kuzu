@@ -219,3 +219,27 @@ Overflow exception: Value 255 * 32767 is not within INT16 range.
 -STATEMENT RETURN CAST(255, "UINT8") * CAST(-32767, "INT16")
 ---- error
 Overflow exception: Value 255 * -32767 is not within INT16 range.
+
+-CASE MultiplyDECIMAL
+-STATEMENT UNWIND [0.6, 1.2, -100.0] as A UNWIND [-0.2, 1.2, 100.5] AS B RETURN CAST(A, 'DECIMAL') * CAST(B, 'DECIMAL');
+---- 9
+-.120
+.720
+60.300
+-.240
+1.440
+120.600
+20.000
+-120.000
+-10050.000
+-STATEMENT UNWIND [0.6, 1.2, -100.0] as A UNWIND [-0.2, 1.2, 100.5] AS B RETURN CAST(A, 'DECIMAL(18, 1)') * CAST(B, 'DECIMAL(5, 2)');
+---- 9
+-.120
+.720
+60.300
+-.240
+1.440
+120.600
+20.000
+-120.000
+-10050.000

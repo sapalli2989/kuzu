@@ -21,6 +21,10 @@ namespace kuzu {
 namespace common {
 
 std::string DecimalType::insertDecimalPoint(const std::string& value, uint32_t positionFromEnd) {
+    if (positionFromEnd == 0) {
+        return value;
+        // Don't want to end up with cases where integral values are followed by a useless dot
+    }
     std::string retval;
     if (positionFromEnd > value.size()) {
         auto greaterBy = positionFromEnd - value.size();

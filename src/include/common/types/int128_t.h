@@ -55,6 +55,12 @@ struct int128_t {
     explicit operator int32_t() const;
     explicit operator int16_t() const;
     explicit operator int8_t() const;
+    explicit operator uint64_t() const;
+    explicit operator uint32_t() const;
+    explicit operator uint16_t() const;
+    explicit operator uint8_t() const;
+    explicit operator double() const;
+    explicit operator float() const;
 };
 
 class Int128_t {
