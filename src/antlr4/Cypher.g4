@@ -837,6 +837,7 @@ kU_NonReservedKeywords
         | CYCLE
         | DECIMAL
         | CONTAINS
+        | DECIMAL
         ;
 
 UnescapedSymbolicName
