@@ -58,7 +58,7 @@ parsed_expr_pair Transformer::transformSetItem(CypherParser::OC_SetItemContext& 
 
 std::unique_ptr<UpdatingClause> Transformer::transformDelete(CypherParser::OC_DeleteContext& ctx) {
     auto deleteClauseType =
-        ctx.DETACH() ? common::DeleteClauseType::DETACH_DELETE : common::DeleteClauseType::DELETE;
+        ctx.DETACH() ? common::DeleteNodeType::DETACH_DELETE : common::DeleteNodeType::DELETE;
     auto deleteClause = std::make_unique<DeleteClause>(deleteClauseType);
     for (auto& expression : ctx.oC_Expression()) {
         deleteClause->addExpression(transformExpression(*expression));

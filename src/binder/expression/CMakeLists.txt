@@ -6,6 +6,7 @@ add_library(
         expression_util.cpp
         function_expression.cpp
         literal_expression.cpp
+        node_rel_expression.cpp
         parameter_expression.cpp
         variable_expression.cpp)
 

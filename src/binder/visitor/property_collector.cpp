@@ -68,16 +68,16 @@ void PropertyCollector::visitSet(const BoundUpdatingClause& updatingClause) {
 }
 
 void PropertyCollector::visitDelete(const BoundUpdatingClause& updatingClause) {
-    auto& boundDeleteClause = (BoundDeleteClause&)updatingClause;
+    auto& boundDeleteClause = updatingClause.constCast<BoundDeleteClause>();
     for (auto& info : boundDeleteClause.getRelInfos()) {
-        auto rel = (RelExpression*)info->nodeOrRel.get();
-        properties.insert(rel->getInternalIDProperty());
+        auto& rel = info.pattern->constCast<RelExpression>();
+        properties.insert(rel.getInternalIDProperty());
     }
 }
 
 void PropertyCollector::visitInsert(const BoundUpdatingClause& updatingClause) {
     auto& insertClause = (BoundInsertClause&)updatingClause;
-    for (auto& info : insertClause.getInfosRef()) {
+    for (auto& info : insertClause.getInfos()) {
         for (auto& expr : info.columnDataExprs) {
             collectPropertyExpressions(expr);
         }

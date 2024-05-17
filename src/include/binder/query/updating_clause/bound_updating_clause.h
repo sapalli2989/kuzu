@@ -12,6 +12,11 @@ public:
 
     common::ClauseType getClauseType() const { return clauseType; }
 
+    template<class TARGET>
+    const TARGET& constCast() const {
+        return common::ku_dynamic_cast<const BoundUpdatingClause&, const TARGET&>(*this);
+    }
+
 private:
     common::ClauseType clauseType;
 };
