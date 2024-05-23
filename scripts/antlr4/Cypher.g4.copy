@@ -835,7 +835,6 @@ kU_NonReservedKeywords
         | MAXVALUE
         | NO
         | CYCLE
-        | DECIMAL
         | CONTAINS
         | DECIMAL
         ;
