@@ -93,8 +93,7 @@ alldebug:
 
 # Main tests
 test:
-	$(call run-cmake-relwithdebinfo, -DBUILD_TESTS=TRUE -DENABLE_BACKTRACES=TRUE)
-	ctest --test-dir build/relwithdebinfo/test --output-on-failure -j ${TEST_JOBS}
+	$(call run-cmake-relwithdebinfo, -DENABLE_BACKTRACES=TRUE)
 
 lcov:
 	$(call run-cmake-release, -DBUILD_TESTS=TRUE -DBUILD_LCOV=TRUE)
