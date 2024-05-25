@@ -10,10 +10,10 @@ namespace kuzu {
 namespace storage {
 
 StringColumnChunk::StringColumnChunk(LogicalType dataType, uint64_t capacity,
-    bool enableCompression, bool inMemory)
-    : ColumnChunk{std::move(dataType), capacity, enableCompression},
-      dictionaryChunk{
-          std::make_unique<DictionaryChunk>(inMemory ? 0 : capacity, enableCompression)},
+    ColumnChunkStatus status, bool enableCompression)
+    : ColumnChunk{std::move(dataType), capacity, status, enableCompression, true /*hasNullChunk*/},
+      dictionaryChunk{std::make_unique<DictionaryChunk>(
+          status == ColumnChunkStatus::IN_MEMORY ? 0 : capacity, enableCompression)},
       needFinalize{false} {}
 
 void StringColumnChunk::resetToEmpty() {

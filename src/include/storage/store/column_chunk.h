@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 #include "common/constants.h"
 #include "common/data_chunk/sel_vector.h"
 #include "common/enums/rel_multiplicity.h"
@@ -17,13 +15,18 @@ namespace storage {
 class NullColumnChunk;
 class CompressionAlg;
 
+enum class ColumnChunkStatus : uint8_t {
+    IN_MEMORY = 0,
+    ON_DISK = 1,
+};
+
 struct ColumnChunkMetadata {
     common::page_idx_t pageIdx;
     common::page_idx_t numPages;
     uint64_t numValues;
     CompressionMetadata compMeta;
 
-    // TODO: Delete copy.
+    // TODO(Guodong/Ben): Delete copy constructor.
     ColumnChunkMetadata() : pageIdx{common::INVALID_PAGE_IDX}, numPages{0}, numValues{0} {}
     ColumnChunkMetadata(common::page_idx_t pageIdx, common::page_idx_t numPages,
         uint64_t numNodesInChunk, const CompressionMetadata& compMeta)
@@ -38,8 +41,9 @@ public:
 
     // ColumnChunks must be initialized after construction, so this constructor should only be used
     // through the ColumnChunkFactory
-    ColumnChunk(common::LogicalType dataType, uint64_t capacity, bool enableCompression = true,
-        bool hasNullChunk = true);
+    ColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
+        bool enableCompression, bool hasNullChunk);
+    ColumnChunk(common::LogicalType dataType, ColumnChunkMetadata metadata);
 
     virtual ~ColumnChunk() = default;
 
@@ -126,19 +130,23 @@ private:
     uint64_t getBufferSize(uint64_t capacity_) const;
 
 protected:
+    using flush_buffer_function_t = std::function<ColumnChunkMetadata(const uint8_t*, uint64_t,
+        BMFileHandle*, common::page_idx_t, const ColumnChunkMetadata&)>;
+    using get_metadata_function_t =
+        std::function<ColumnChunkMetadata(const uint8_t*, uint64_t, uint64_t, uint64_t)>;
+
     common::LogicalType dataType;
     uint32_t numBytesPerValue;
     uint64_t bufferSize;
     uint64_t capacity;
+    ColumnChunkStatus status;
     std::unique_ptr<uint8_t[]> buffer;
     std::unique_ptr<NullColumnChunk> nullChunk;
     uint64_t numValues;
-    std::function<ColumnChunkMetadata(const uint8_t*, uint64_t, BMFileHandle*, common::page_idx_t,
-        const ColumnChunkMetadata&)>
-        flushBufferFunction;
-    std::function<ColumnChunkMetadata(const uint8_t*, uint64_t, uint64_t, uint64_t)>
-        getMetadataFunction;
+    flush_buffer_function_t flushBufferFunction;
+    get_metadata_function_t getMetadataFunction;
     bool enableCompression;
+    ColumnChunkMetadata metadata;
 };
 
 template<>
@@ -156,8 +164,9 @@ inline bool ColumnChunk::getValue(common::offset_t pos) const {
 // Stored as bitpacked booleans in-memory and on-disk
 class BoolColumnChunk : public ColumnChunk {
 public:
-    explicit BoolColumnChunk(uint64_t capacity, bool enableCompression, bool hasNullChunk = true)
-        : ColumnChunk(*common::LogicalType::BOOL(), capacity,
+    explicit BoolColumnChunk(uint64_t capacity, ColumnChunkStatus status, bool enableCompression,
+        bool hasNullChunk = true)
+        : ColumnChunk(*common::LogicalType::BOOL(), capacity, status,
               // Booleans are always bitpacked, but this can also enable constant compression
               enableCompression, hasNullChunk) {}
 
@@ -178,8 +187,8 @@ public:
 
 class NullColumnChunk final : public BoolColumnChunk {
 public:
-    explicit NullColumnChunk(uint64_t capacity, bool enableCompression)
-        : BoolColumnChunk(capacity, enableCompression, false /*hasNullChunk*/),
+    explicit NullColumnChunk(uint64_t capacity, ColumnChunkStatus status, bool enableCompression)
+        : BoolColumnChunk(capacity, status, enableCompression, false /*hasNullChunk*/),
           mayHaveNullValue{false} {}
     // Maybe this should be combined with BoolColumnChunk if the only difference is these functions?
     inline bool isNull(common::offset_t pos) const { return getValue<bool>(pos); }
@@ -228,13 +237,8 @@ struct ColumnChunkFactory {
     // inMemory starts string column chunk dictionaries at zero instead of reserving space for
     // values to grow
     static std::unique_ptr<ColumnChunk> createColumnChunk(common::LogicalType dataType,
-        bool enableCompression, uint64_t capacity = common::StorageConstants::NODE_GROUP_SIZE,
-        bool inMemory = false);
-
-    static std::unique_ptr<ColumnChunk> createNullColumnChunk(bool enableCompression,
-        uint64_t capacity = common::StorageConstants::NODE_GROUP_SIZE) {
-        return std::make_unique<NullColumnChunk>(capacity, enableCompression);
-    }
+        ColumnChunkStatus status, bool enableCompression,
+        uint64_t capacity = common::StorageConstants::NODE_GROUP_SIZE);
 };
 
 } // namespace storage

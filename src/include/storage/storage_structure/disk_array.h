@@ -27,7 +27,7 @@ static constexpr uint64_t NUM_PAGE_IDXS_PER_PIP =
  */
 struct DiskArrayHeader {
     // This constructor is needed when loading the database from file.
-    DiskArrayHeader() : DiskArrayHeader(1) {};
+    DiskArrayHeader() : DiskArrayHeader(1){};
 
     explicit DiskArrayHeader(uint64_t elementSize);
 
@@ -116,6 +116,8 @@ public:
     void get(uint64_t idx, transaction::TransactionType trxType, std::span<std::byte> val);
 
     // Note: This function is to be used only by the WRITE trx.
+    // TODO(Ben/Guodong): This function should take a const reference of `val` to avoid implicit
+    // copy.
     void update(uint64_t idx, std::span<std::byte> val);
 
     // Note: This function is to be used only by the WRITE trx.

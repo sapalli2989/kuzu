@@ -25,14 +25,15 @@ void ListDataColumnChunk::resizeBuffer(uint64_t numValues) {
     dataColumnChunk->resize(capacity);
 }
 
-ListColumnChunk::ListColumnChunk(LogicalType dataType, uint64_t capacity, bool enableCompression,
-    bool inMemory)
-    : ColumnChunk{std::move(dataType), capacity, enableCompression, true /* hasNullChunk */} {
-    sizeColumnChunk = ColumnChunkFactory::createColumnChunk(*common::LogicalType::UINT32(),
+ListColumnChunk::ListColumnChunk(LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
+    bool enableCompression)
+    : ColumnChunk{std::move(dataType), capacity, status, enableCompression,
+          true /* hasNullChunk */} {
+    sizeColumnChunk = ColumnChunkFactory::createColumnChunk(*common::LogicalType::UINT32(), status,
         enableCompression, capacity);
     listDataColumnChunk = std::make_unique<ListDataColumnChunk>(
         ColumnChunkFactory::createColumnChunk(*ListType::getChildType(this->dataType).copy(),
-            enableCompression, 0 /* capacity */, inMemory));
+            status, enableCompression, 0 /* capacity */));
     checkOffsetSortedAsc = false;
     KU_ASSERT(this->dataType.getPhysicalType() == PhysicalTypeID::LIST ||
               this->dataType.getPhysicalType() == PhysicalTypeID::ARRAY);
@@ -102,7 +103,7 @@ void ListColumnChunk::resetToEmpty() {
     sizeColumnChunk->resetToEmpty();
     listDataColumnChunk = std::make_unique<ListDataColumnChunk>(
         ColumnChunkFactory::createColumnChunk(*ListType::getChildType(this->dataType).copy(),
-            enableCompression, 0 /* capacity */));
+            status, enableCompression, 0 /* capacity */));
 }
 
 void ListColumnChunk::append(ValueVector* vector, const SelectionVector& selVector) {
@@ -300,7 +301,7 @@ void ListColumnChunk::resetOffset() {
 
 void ListColumnChunk::finalize() {
     // rewrite the column chunk for better scanning performance
-    auto newColumnChunk = ColumnChunkFactory::createColumnChunk(std::move(*dataType.copy()),
+    auto newColumnChunk = ColumnChunkFactory::createColumnChunk(std::move(*dataType.copy()), status,
         enableCompression, capacity);
     uint64_t totalListLen = listDataColumnChunk->getNumValues();
     uint64_t resizeThreshold = listDataColumnChunk->capacity / 2;

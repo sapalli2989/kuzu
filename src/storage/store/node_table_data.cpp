@@ -36,16 +36,23 @@ NodeTableData::NodeTableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
         std::max_element(properties.begin(), properties.end(), [](auto& a, auto& b) {
             return a.getColumnID() < b.getColumnID();
         })->getColumnID();
-    columns.resize(maxColumnID + 1);
+    std::vector<std::unique_ptr<DiskArray<ColumnChunkMetadata>>> columnMetadataDAs;
+    columnMetadataDAs.resize(maxColumnID + 1);
+    //    columns.resize(maxColumnID + 1);
     for (auto i = 0u; i < properties.size(); i++) {
         auto& property = properties[i];
         const auto metadataDAHInfo = dynamic_cast<NodesStoreStatsAndDeletedIDs*>(tablesStatistics)
                                          ->getMetadataDAHInfo(&DUMMY_WRITE_TRANSACTION, tableID, i);
-        const auto columnName =
-            StorageUtils::getColumnName(property.getName(), StorageUtils::ColumnType::DEFAULT, "");
-        columns[property.getColumnID()] = ColumnFactory::createColumn(columnName,
-            *property.getDataType()->copy(), *metadataDAHInfo, dataFH, metadataFH, bufferManager,
-            wal, &DUMMY_WRITE_TRANSACTION, enableCompression);
+        columnMetadataDAs[property.getColumnID()] =
+            std::make_unique<DiskArray<ColumnChunkMetadata>>(*metadataFH,
+                DBFileID::newMetadataFileID(), metadataDAHInfo->dataDAHPageIdx, bufferManager, wal,
+                &DUMMY_WRITE_TRANSACTION);
+        //        const auto columnName =
+        //            StorageUtils::getColumnName(property.getName(),
+        //            StorageUtils::ColumnType::DEFAULT, "");
+        //        columns[property.getColumnID()] = ColumnFactory::createColumn(columnName,
+        //            *property.getDataType()->copy(), *metadataDAHInfo, dataFH, metadataFH,
+        //            bufferManager, wal, &DUMMY_WRITE_TRANSACTION, enableCompression);
     }
 }
 

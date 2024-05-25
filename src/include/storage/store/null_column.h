@@ -47,7 +47,8 @@ public:
 
 private:
     std::unique_ptr<ColumnChunk> getEmptyChunkForCommit(uint64_t capacity) override {
-        return ColumnChunkFactory::createNullColumnChunk(enableCompression, capacity);
+        return std::make_unique<NullColumnChunk>(capacity, ColumnChunkStatus::IN_MEMORY,
+            enableCompression);
     }
 };
 

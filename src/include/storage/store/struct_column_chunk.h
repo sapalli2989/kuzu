@@ -10,8 +10,8 @@ namespace storage {
 
 class StructColumnChunk final : public ColumnChunk {
 public:
-    StructColumnChunk(common::LogicalType dataType, uint64_t capacity, bool enableCompression,
-        bool inMemory);
+    StructColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
+        bool enableCompression);
 
     inline ColumnChunk* getChild(common::vector_idx_t childIdx) {
         KU_ASSERT(childIdx < childChunks.size());

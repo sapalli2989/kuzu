@@ -13,13 +13,13 @@ namespace storage {
 // TODO: need to handle this case, when the whole struct entry is null, should set all fields to
 // null too.
 StructColumnChunk::StructColumnChunk(LogicalType dataType, uint64_t capacity,
-    bool enableCompression, bool inMemory)
-    : ColumnChunk{std::move(dataType), capacity} {
+    ColumnChunkStatus status, bool enableCompression)
+    : ColumnChunk{std::move(dataType), capacity, status, enableCompression, true /*hasNullChunk*/} {
     auto fieldTypes = StructType::getFieldTypes(this->dataType);
     childChunks.resize(fieldTypes.size());
     for (auto i = 0u; i < fieldTypes.size(); i++) {
-        childChunks[i] = ColumnChunkFactory::createColumnChunk(*fieldTypes[i].copy(),
-            enableCompression, capacity, inMemory);
+        childChunks[i] = ColumnChunkFactory::createColumnChunk(*fieldTypes[i].copy(), status,
+            enableCompression, capacity);
     }
 }
 

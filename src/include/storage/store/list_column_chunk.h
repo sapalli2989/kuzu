@@ -28,8 +28,8 @@ struct ListDataColumnChunk {
 class ListColumnChunk final : public ColumnChunk {
 
 public:
-    ListColumnChunk(common::LogicalType dataType, uint64_t capacity, bool enableCompression,
-        bool inMemory);
+    ListColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
+        bool enableCompression);
 
     ColumnChunk* getDataColumnChunk() const { return listDataColumnChunk->dataColumnChunk.get(); }
 

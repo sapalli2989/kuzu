@@ -11,8 +11,8 @@ namespace storage {
 
 class StringColumnChunk final : public ColumnChunk {
 public:
-    StringColumnChunk(common::LogicalType dataType, uint64_t capacity, bool enableCompression,
-        bool inMemory);
+    StringColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
+        bool enableCompression);
 
     void resetToEmpty() final;
     void append(common::ValueVector* vector, const common::SelectionVector& selVector) final;

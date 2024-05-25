@@ -2,6 +2,7 @@
 
 #include "storage/store/chunked_node_group.h"
 #include "storage/store/column.h"
+#include "storage/store/node_group.h"
 
 namespace kuzu {
 namespace catalog {
@@ -73,6 +74,7 @@ protected:
     BufferManager* bufferManager;
     WAL* wal;
     bool enableCompression;
+    std::vector<NodeGroup> nodeGroups;
     std::vector<std::unique_ptr<Column>> columns;
 };
 

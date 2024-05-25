@@ -146,12 +146,12 @@ static std::shared_ptr<CompressionAlg> getCompression(const LogicalType& dataTyp
     }
 }
 
-ColumnChunk::ColumnChunk(LogicalType dataType, uint64_t capacity, bool enableCompression,
-    bool hasNullChunk)
+ColumnChunk::ColumnChunk(LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
+    bool enableCompression, bool hasNullChunk)
     : dataType{std::move(dataType)}, numBytesPerValue{getDataTypeSizeInChunk(this->dataType)},
-      numValues{0}, enableCompression(enableCompression) {
+      status{status}, numValues{0}, enableCompression(enableCompression) {
     if (hasNullChunk) {
-        nullChunk = std::make_unique<NullColumnChunk>(capacity, enableCompression);
+        nullChunk = std::make_unique<NullColumnChunk>(capacity, status, enableCompression);
     }
     initializeBuffer(capacity);
     initializeFunction();
@@ -398,12 +398,12 @@ ColumnChunkMetadata ColumnChunk::getMetadataToFlush() const {
 }
 
 ColumnChunkMetadata ColumnChunk::flushBuffer(BMFileHandle* dataFH, page_idx_t startPageIdx,
-    const ColumnChunkMetadata& metadata) {
-    if (!metadata.compMeta.isConstant()) {
+    const ColumnChunkMetadata& metadata_) {
+    if (!metadata_.compMeta.isConstant()) {
         KU_ASSERT(bufferSize == getBufferSize(capacity));
-        return flushBufferFunction(buffer.get(), bufferSize, dataFH, startPageIdx, metadata);
+        return flushBufferFunction(buffer.get(), bufferSize, dataFH, startPageIdx, metadata_);
     }
-    return metadata;
+    return metadata_;
 }
 
 uint64_t ColumnChunk::getBufferSize(uint64_t capacity_) const {
@@ -523,8 +523,10 @@ void NullColumnChunk::append(ColumnChunk* other, offset_t startOffsetInOtherChun
 class InternalIDColumnChunk final : public ColumnChunk {
 public:
     // Physically, we only materialize offset of INTERNAL_ID, which is same as UINT64,
-    explicit InternalIDColumnChunk(uint64_t capacity, bool enableCompression)
-        : ColumnChunk(*LogicalType::INTERNAL_ID(), capacity, enableCompression),
+    explicit InternalIDColumnChunk(uint64_t capacity, ColumnChunkStatus status,
+        bool enableCompression)
+        : ColumnChunk(*LogicalType::INTERNAL_ID(), capacity, status, enableCompression,
+              true /* hasNullChunk */),
           commonTableID{INVALID_TABLE_ID} {}
 
     void append(ValueVector* vector, const common::SelectionVector& selVector) override {
@@ -604,10 +606,10 @@ private:
 };
 
 std::unique_ptr<ColumnChunk> ColumnChunkFactory::createColumnChunk(LogicalType dataType,
-    bool enableCompression, uint64_t capacity, bool inMemory) {
+    ColumnChunkStatus status, bool enableCompression, uint64_t capacity) {
     switch (dataType.getPhysicalType()) {
     case PhysicalTypeID::BOOL: {
-        return std::make_unique<BoolColumnChunk>(capacity, enableCompression);
+        return std::make_unique<BoolColumnChunk>(capacity, status, enableCompression);
     }
     case PhysicalTypeID::INT64:
     case PhysicalTypeID::INT32:
@@ -623,24 +625,25 @@ std::unique_ptr<ColumnChunk> ColumnChunkFactory::createColumnChunk(LogicalType d
     case PhysicalTypeID::INTERVAL: {
         // TODO: As we have constant compression, SERIAL column should always be compressed as
         // constant non-null when flushed to disk. We should add a sanity check for this.
-        return std::make_unique<ColumnChunk>(std::move(dataType), capacity, enableCompression);
+        return std::make_unique<ColumnChunk>(std::move(dataType), capacity, status,
+            enableCompression, true /*hasNullChunk*/);
     }
         // Physically, we only materialize offset of INTERNAL_ID, which is same as INT64,
     case PhysicalTypeID::INTERNAL_ID: {
-        return std::make_unique<InternalIDColumnChunk>(capacity, enableCompression);
+        return std::make_unique<InternalIDColumnChunk>(capacity, status, enableCompression);
     }
     case PhysicalTypeID::STRING: {
-        return std::make_unique<StringColumnChunk>(std::move(dataType), capacity, enableCompression,
-            inMemory);
+        return std::make_unique<StringColumnChunk>(std::move(dataType), capacity, status,
+            enableCompression);
     }
     case PhysicalTypeID::ARRAY:
     case PhysicalTypeID::LIST: {
-        return std::make_unique<ListColumnChunk>(std::move(dataType), capacity, enableCompression,
-            inMemory);
+        return std::make_unique<ListColumnChunk>(std::move(dataType), capacity, status,
+            enableCompression);
     }
     case PhysicalTypeID::STRUCT: {
-        return std::make_unique<StructColumnChunk>(std::move(dataType), capacity, enableCompression,
-            inMemory);
+        return std::make_unique<StructColumnChunk>(std::move(dataType), capacity, status,
+            enableCompression);
     }
     default:
         KU_UNREACHABLE;
