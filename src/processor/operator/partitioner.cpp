@@ -156,6 +156,7 @@ void Partitioner::copyDataToPartitions(partition_idx_t partitioningIdx, DataChun
     }
     SelectionVector selVector(1);
     selVector.setToFiltered(1);
+    // TODO(Guodong): Rework the copy to one partition at a time instead of one tuple at a time.
     for (auto i = 0u; i < chunkToCopyFrom.state->getSelVector().getSelSize(); i++) {
         auto posToCopyFrom = chunkToCopyFrom.state->getSelVector()[i];
         auto partitionIdx = partitionIdxes->getValue<partition_idx_t>(posToCopyFrom);

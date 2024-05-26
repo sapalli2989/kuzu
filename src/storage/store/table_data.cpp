@@ -8,12 +8,10 @@ using namespace kuzu::transaction;
 namespace kuzu {
 namespace storage {
 
-TableData::TableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
-    catalog::TableCatalogEntry* tableEntry, BufferManager* bufferManager, WAL* wal,
-    bool enableCompression)
-    : dataFH{dataFH}, metadataFH{metadataFH}, tableID{tableEntry->getTableID()},
-      tableName{tableEntry->getName()}, bufferManager{bufferManager}, wal{wal},
-      enableCompression{enableCompression} {}
+TableData::TableData(BMFileHandle* dataFH, BMFileHandle* metadataFH, table_id_t tableID,
+    const std::string& tableName, BufferManager* bufferManager, WAL* wal, bool enableCompression)
+    : dataFH{dataFH}, metadataFH{metadataFH}, tableID{tableID}, tableName{tableName},
+      bufferManager{bufferManager}, wal{wal}, enableCompression{enableCompression} {}
 
 void TableData::addColumn(Transaction* transaction, const std::string& colNamePrefix,
     DiskArray<ColumnChunkMetadata>* metadataDA, const MetadataDAHInfo& metadataDAHInfo,

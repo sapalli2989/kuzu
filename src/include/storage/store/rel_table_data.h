@@ -45,8 +45,8 @@ struct CSRHeaderColumns {
         offset->scan(transaction, nodeGroupIdx, chunks.offset.get());
         length->scan(transaction, nodeGroupIdx, chunks.length.get());
     }
-    void append(const ChunkedCSRHeader& headerChunks, Column::ChunkState& offsetState,
-        Column::ChunkState& lengthState) const {
+    void append(const ChunkedCSRHeader& headerChunks, ChunkState& offsetState,
+        ChunkState& lengthState) const {
         offset->append(headerChunks.offset.get(), offsetState);
         length->append(headerChunks.length.get(), lengthState);
     }
@@ -131,10 +131,10 @@ public:
 
     void initializeScanState(transaction::Transaction* transaction,
         TableScanState& scanState) const override;
-    void scan(transaction::Transaction* transaction, TableDataScanState& readState,
+    void scan(transaction::Transaction* transaction, TableScanState& readState,
         common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
-    void lookup(transaction::Transaction* transaction, TableDataScanState& readState,
+    void lookup(transaction::Transaction* transaction, TableScanState& readState,
         const common::ValueVector& inNodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
 

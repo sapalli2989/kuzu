@@ -40,8 +40,7 @@ void RelTable::initializeScanState(Transaction* transaction, TableScanState& sca
 bool RelTable::scanInternal(Transaction* transaction, TableScanState& scanState) {
     const auto& relScanState = ku_dynamic_cast<TableScanState&, RelTableScanState&>(scanState);
     const auto tableData = getDirectedTableData(relScanState.direction);
-    tableData->scan(transaction, *scanState.dataScanState, *scanState.nodeIDVector,
-        scanState.outputVectors);
+    tableData->scan(transaction, scanState, *scanState.nodeIDVector, scanState.outputVectors);
     return true;
 }
 

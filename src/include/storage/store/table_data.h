@@ -22,7 +22,7 @@ struct TableDataScanState {
     DELETE_COPY_DEFAULT_MOVE(TableDataScanState);
 
     std::vector<common::column_id_t> columnIDs;
-    std::vector<Column::ChunkState> chunkStates;
+    std::vector<ChunkState> chunkStates;
 };
 
 class LocalTableData;
@@ -32,10 +32,10 @@ public:
 
     virtual void initializeScanState(transaction::Transaction* transaction,
         TableScanState& scanState) const = 0;
-    virtual void scan(transaction::Transaction* transaction, TableDataScanState& readState,
+    virtual void scan(transaction::Transaction* transaction, TableScanState& readState,
         common::ValueVector& nodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) = 0;
-    virtual void lookup(transaction::Transaction* transaction, TableDataScanState& readState,
+    virtual void lookup(transaction::Transaction* transaction, TableScanState& readState,
         const common::ValueVector& nodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) = 0;
 
@@ -62,8 +62,8 @@ public:
     virtual common::node_group_idx_t getNumCommittedNodeGroups() const = 0;
 
 protected:
-    TableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
-        catalog::TableCatalogEntry* tableEntry, BufferManager* bufferManager, WAL* wal,
+    TableData(BMFileHandle* dataFH, BMFileHandle* metadataFH, common::table_id_t tableID,
+        const std::string& tableName, BufferManager* bufferManager, WAL* wal,
         bool enableCompression);
 
 protected:

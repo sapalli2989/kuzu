@@ -182,8 +182,8 @@ public:
         KU_UNREACHABLE;
     }
 
-    void commitColumnChunkOutOfPlace(Transaction*, ChunkState&, bool,
-        const std::vector<common::offset_t>&, ColumnChunk*, common::offset_t) override {
+    void commitColumnChunkOutOfPlace(Transaction*, ChunkState&, bool, const std::vector<offset_t>&,
+        ColumnChunk*, offset_t) override {
         // Note: only updates to rel table can trigger this code path. SERIAL is not supported in
         // rel table yet.
         KU_UNREACHABLE;
@@ -199,7 +199,7 @@ public:
 
 InternalIDColumn::InternalIDColumn(std::string name, const MetadataDAHInfo& metaDAHeaderInfo,
     BMFileHandle* dataFH, BMFileHandle* metadataFH, BufferManager* bufferManager, WAL* wal,
-    transaction::Transaction* transaction, bool enableCompression)
+    Transaction* transaction, bool enableCompression)
     : Column{name, *LogicalType::INTERNAL_ID(), metaDAHeaderInfo, dataFH, metadataFH, bufferManager,
           wal, transaction, enableCompression, false /*requireNullColumn*/},
       commonTableID{INVALID_TABLE_ID} {}
@@ -215,7 +215,7 @@ void InternalIDColumn::populateCommonTableID(const ValueVector* resultVector) co
 
 Column::Column(std::string name, LogicalType dataType, const MetadataDAHInfo& metaDAHeaderInfo,
     BMFileHandle* dataFH, BMFileHandle* metadataFH, BufferManager* bufferManager, WAL* wal,
-    transaction::Transaction* transaction, bool enableCompression, bool requireNullColumn)
+    Transaction* transaction, bool enableCompression, bool requireNullColumn)
     : name{std::move(name)}, dbFileID{DBFileID::newDataFileID()}, dataType{std::move(dataType)},
       dataFH{dataFH}, metadataFH{metadataFH}, bufferManager{bufferManager}, wal{wal},
       enableCompression{enableCompression} {
@@ -746,7 +746,8 @@ void Column::commitLocalChunkInPlace(ChunkState& state, const ChunkCollection& l
 }
 
 std::unique_ptr<ColumnChunk> Column::getEmptyChunkForCommit(uint64_t capacity) {
-    return ColumnChunkFactory::createColumnChunk(*dataType.copy(), enableCompression, capacity);
+    return ColumnChunkFactory::createColumnChunk(*dataType.copy(), ColumnChunkStatus::IN_MEMORY,
+        enableCompression, capacity);
 }
 
 // TODO: Pass state in to avoid access metadata.
@@ -853,7 +854,8 @@ void Column::populateWithDefaultVal(Transaction* transaction,
     DiskArray<ColumnChunkMetadata>* metadataDA_, ValueVector* defaultValueVector) {
     KU_ASSERT(metadataDA_ != nullptr);
     auto numNodeGroups = metadataDA_->getNumElements(transaction->getType());
-    auto columnChunk = ColumnChunkFactory::createColumnChunk(*dataType.copy(), enableCompression);
+    auto columnChunk = ColumnChunkFactory::createColumnChunk(*dataType.copy(),
+        ColumnChunkStatus::IN_MEMORY, enableCompression);
     columnChunk->populateWithDefaultVal(defaultValueVector);
     ChunkState state;
     for (auto nodeGroupIdx = 0u; nodeGroupIdx < numNodeGroups; nodeGroupIdx++) {
@@ -865,7 +867,7 @@ void Column::populateWithDefaultVal(Transaction* transaction,
         }
         if (capacity > columnChunk->getCapacity()) {
             auto newColumnChunk = ColumnChunkFactory::createColumnChunk(*dataType.copy(),
-                enableCompression, capacity);
+                ColumnChunkStatus::IN_MEMORY, enableCompression, capacity);
             newColumnChunk->populateWithDefaultVal(defaultValueVector);
             newColumnChunk->setNumValues(chunkMeta.numValues);
             append(newColumnChunk.get(), state);

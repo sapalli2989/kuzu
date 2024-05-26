@@ -30,6 +30,7 @@ class ListColumnChunk final : public ColumnChunk {
 public:
     ListColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
         bool enableCompression);
+    ListColumnChunk(Column& column, common::node_group_idx_t nodeGroupIdx);
 
     ColumnChunk* getDataColumnChunk() const { return listDataColumnChunk->dataColumnChunk.get(); }
 

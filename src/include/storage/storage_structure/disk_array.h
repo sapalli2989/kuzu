@@ -71,7 +71,7 @@ struct PIPUpdates {
     std::optional<PIPWrapper> updatedLastPIP;
     std::vector<PIPWrapper> newPIPs;
 
-    inline void clear() {
+    void clear() {
         updatedLastPIP.reset();
         newPIPs.clear();
     }
@@ -127,11 +127,11 @@ public:
     // Note: Currently, this function doesn't support shrinking the size of the array.
     uint64_t resize(uint64_t newNumElements, std::span<std::byte> defaultVal);
 
-    virtual inline void checkpointInMemoryIfNecessary() {
+    virtual void checkpointInMemoryIfNecessary() {
         std::unique_lock xlock{this->diskArraySharedMtx};
         checkpointOrRollbackInMemoryIfNecessaryNoLock(true /* is checkpoint */);
     }
-    virtual inline void rollbackInMemoryIfNecessary() {
+    virtual void rollbackInMemoryIfNecessary() {
         std::unique_lock xlock{this->diskArraySharedMtx};
         checkpointOrRollbackInMemoryIfNecessaryNoLock(false /* is rollback */);
     }
@@ -171,7 +171,7 @@ public:
         // Adds a new element to the disk array and seeks to the new element
         void pushBack(std::span<std::byte> val);
 
-        inline WriteIterator& operator+=(size_t increment) { return seek(idx + increment); }
+        WriteIterator& operator+=(size_t increment) { return seek(idx + increment); }
 
         ~WriteIterator() { unpin(); }
 
@@ -181,7 +181,7 @@ public:
             return std::span(walPageIdxAndFrame.frame + apCursor.elemPosInPage, valueSize);
         }
 
-        inline uint64_t size() const { return diskArray.headerForWriteTrx.numElements; }
+        uint64_t size() const { return diskArray.headerForWriteTrx.numElements; }
 
     private:
         void unpin();
@@ -190,7 +190,7 @@ public:
 
     WriteIterator iter_mut(uint64_t valueSize);
 
-    inline common::page_idx_t getAPIdx(uint64_t idx) const;
+    common::page_idx_t getAPIdx(uint64_t idx) const;
 
 protected:
     // Updates to new pages (new to this transaction) bypass the wal file.
@@ -200,11 +200,11 @@ protected:
 
     uint64_t pushBackNoLock(std::span<std::byte> val);
 
-    inline uint64_t getNumElementsNoLock(transaction::TransactionType trxType) {
+    uint64_t getNumElementsNoLock(transaction::TransactionType trxType) {
         return getDiskArrayHeader(trxType).numElements;
     }
 
-    inline uint64_t getNumAPsNoLock(transaction::TransactionType trxType) {
+    uint64_t getNumAPsNoLock(transaction::TransactionType trxType) {
         return getDiskArrayHeader(trxType).numAPs;
     }
 
@@ -227,7 +227,7 @@ private:
     bool checkOutOfBoundAccess(transaction::TransactionType trxType, uint64_t idx);
     bool hasPIPUpdatesNoLock(uint64_t pipIdx);
 
-    inline const DiskArrayHeader& getDiskArrayHeader(transaction::TransactionType trxType) {
+    const DiskArrayHeader& getDiskArrayHeader(transaction::TransactionType trxType) {
         if (trxType == transaction::TransactionType::READ_ONLY) {
             return header;
         } else {
@@ -260,7 +260,7 @@ protected:
 };
 
 template<typename U>
-inline std::span<std::byte> getSpan(U& val) {
+std::span<std::byte> getSpan(U& val) {
     return std::span(reinterpret_cast<std::byte*>(&val), sizeof(U));
 }
 
@@ -280,67 +280,67 @@ public:
 
     // Note: This function is to be used only by the WRITE trx.
     // The return value is the idx of val in array.
-    inline uint64_t pushBack(U val) { return diskArray.pushBack(getSpan(val)); }
+    uint64_t pushBack(U val) { return diskArray.pushBack(getSpan(val)); }
 
     // Note: This function is to be used only by the WRITE trx.
-    inline void update(uint64_t idx, U val) { diskArray.update(idx, getSpan(val)); }
+    void update(uint64_t idx, U val) { diskArray.update(idx, getSpan(val)); }
 
-    inline U get(uint64_t idx, transaction::TransactionType trxType) {
+    U get(uint64_t idx, transaction::TransactionType trxType) {
         U val;
         diskArray.get(idx, trxType, getSpan(val));
         return val;
     }
 
     // Note: Currently, this function doesn't support shrinking the size of the array.
-    inline uint64_t resize(uint64_t newNumElements) {
+    uint64_t resize(uint64_t newNumElements) {
         U defaultVal;
         return diskArray.resize(newNumElements, getSpan(defaultVal));
     }
 
-    inline uint64_t getNumElements(
+    uint64_t getNumElements(
         transaction::TransactionType trxType = transaction::TransactionType::READ_ONLY) {
         return diskArray.getNumElements(trxType);
     }
 
-    inline void checkpointInMemoryIfNecessary() { diskArray.checkpointInMemoryIfNecessary(); }
-    inline void rollbackInMemoryIfNecessary() { diskArray.rollbackInMemoryIfNecessary(); }
-    inline void prepareCommit() { diskArray.prepareCommit(); }
+    void checkpointInMemoryIfNecessary() { diskArray.checkpointInMemoryIfNecessary(); }
+    void rollbackInMemoryIfNecessary() { diskArray.rollbackInMemoryIfNecessary(); }
+    void prepareCommit() { diskArray.prepareCommit(); }
 
     class WriteIterator {
     public:
         explicit WriteIterator(DiskArrayInternal::WriteIterator&& iter) : iter(std::move(iter)) {}
-        inline U& operator*() { return *reinterpret_cast<U*>((*iter).data()); }
+        U& operator*() { return *reinterpret_cast<U*>((*iter).data()); }
         DELETE_COPY_DEFAULT_MOVE(WriteIterator);
 
-        inline WriteIterator& operator+=(size_t dist) {
+        WriteIterator& operator+=(size_t dist) {
             iter += dist;
             return *this;
         }
 
-        inline WriteIterator& seek(size_t idx) {
+        WriteIterator& seek(size_t idx) {
             iter.seek(idx);
             return *this;
         }
 
-        inline uint64_t idx() const { return iter.idx; }
-        inline uint64_t getAPIdx() const { return iter.apCursor.pageIdx; }
+        uint64_t idx() const { return iter.idx; }
+        uint64_t getAPIdx() const { return iter.apCursor.pageIdx; }
 
-        inline WriteIterator& pushBack(U val) {
+        WriteIterator& pushBack(U val) {
             iter.pushBack(getSpan(val));
             return *this;
         }
 
-        inline uint64_t size() const { return iter.size(); }
+        uint64_t size() const { return iter.size(); }
 
     private:
         DiskArrayInternal::WriteIterator iter;
     };
 
-    inline WriteIterator iter_mut() { return WriteIterator{diskArray.iter_mut(sizeof(U))}; }
-    inline uint64_t getAPIdx(uint64_t idx) const { return diskArray.getAPIdx(idx); }
+    WriteIterator iter_mut() { return WriteIterator{diskArray.iter_mut(sizeof(U))}; }
+    uint64_t getAPIdx(uint64_t idx) const { return diskArray.getAPIdx(idx); }
     static constexpr uint32_t getAlignedElementSize() { return std::bit_ceil(sizeof(U)); }
 
-    static inline common::page_idx_t addDAHPageToFile(BMFileHandle& fileHandle,
+    static common::page_idx_t addDAHPageToFile(BMFileHandle& fileHandle,
         BufferManager* bufferManager, WAL* wal) {
         DiskArrayHeader daHeader(sizeof(U));
         return DBFileUtils::insertNewPage(fileHandle, DBFileID{DBFileType::METADATA},
@@ -348,7 +348,7 @@ public:
             [&](uint8_t* frame) -> void { memcpy(frame, &daHeader, sizeof(DiskArrayHeader)); });
     }
 
-    static inline void addDAHPageToFile(FileHandle& fileHandle, common::page_idx_t pageIdx) {
+    static void addDAHPageToFile(FileHandle& fileHandle, common::page_idx_t pageIdx) {
         std::array<uint8_t, common::BufferPoolConstants::PAGE_4KB_SIZE> buffer;
         DiskArrayHeader header(sizeof(U));
         memcpy(buffer.data(), &header, sizeof(DiskArrayHeader));
@@ -368,7 +368,7 @@ public:
     // anything to the wal.
     void resize(uint64_t newNumElements, std::span<std::byte> defaultVal);
 
-    inline uint64_t size() const { return header.numElements; }
+    uint64_t size() const { return header.numElements; }
 
     // [] operator can be used to update elements, e.g., diskArray[5] = 4, when building an
     // InMemDiskArrayBuilder without transactional updates. This changes the contents directly in
@@ -376,7 +376,7 @@ public:
     uint8_t* operator[](uint64_t idx);
 
 protected:
-    inline uint64_t addInMemoryArrayPage(bool setToZero) {
+    uint64_t addInMemoryArrayPage(bool setToZero) {
         inMemArrayPages.emplace_back(
             std::make_unique<uint8_t[]>(common::BufferPoolConstants::PAGE_4KB_SIZE));
         if (setToZero) {
@@ -387,7 +387,7 @@ protected:
     }
 
 private:
-    inline uint64_t getNumArrayPagesNeededForElements(uint64_t numElements) const {
+    uint64_t getNumArrayPagesNeededForElements(uint64_t numElements) const {
         return (numElements >> this->header.numElementsPerPageLog2) +
                ((numElements & this->header.elementPageOffsetMask) > 0 ? 1 : 0);
     }
@@ -403,14 +403,14 @@ class BlockVector {
 public:
     explicit BlockVector(uint64_t numElements = 0) : vector(sizeof(U)) { resize(numElements); }
 
-    inline U& operator[](uint64_t idx) { return *(U*)vector[idx]; }
+    U& operator[](uint64_t idx) { return *(U*)vector[idx]; }
 
-    inline void resize(uint64_t newNumElements) {
+    void resize(uint64_t newNumElements) {
         U defaultVal;
         vector.resize(newNumElements, getSpan(defaultVal));
     }
 
-    inline uint64_t size() const { return vector.size(); }
+    uint64_t size() const { return vector.size(); }
 
     static constexpr uint32_t getAlignedElementSize() {
         return DiskArray<U>::getAlignedElementSize();

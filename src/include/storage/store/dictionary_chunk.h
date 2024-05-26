@@ -5,12 +5,14 @@
 namespace kuzu {
 namespace storage {
 
+class DictionaryColumn;
 class DictionaryChunk {
 public:
     using string_offset_t = uint64_t;
     using string_index_t = uint32_t;
 
     DictionaryChunk(uint64_t capacity, bool enableCompression);
+    DictionaryChunk(const DictionaryColumn& column, common::node_group_idx_t nodeGroupIdx);
     // A pointer to the dictionary chunk is stored in the StringOps for the indexTable
     // and can't be modified easily. Moving would invalidate that pointer
     DictionaryChunk(DictionaryChunk&& other) = delete;
@@ -23,8 +25,8 @@ public:
 
     std::string_view getString(string_index_t index) const;
 
-    inline ColumnChunk* getStringDataChunk() const { return stringDataChunk.get(); }
-    inline ColumnChunk* getOffsetChunk() const { return offsetChunk.get(); }
+    ColumnChunk* getStringDataChunk() const { return stringDataChunk.get(); }
+    ColumnChunk* getOffsetChunk() const { return offsetChunk.get(); }
 
     bool sanityCheck() const;
 
@@ -51,16 +53,16 @@ private:
             return std::hash<std::string_view>()(entry.get(*dict));
         }
         std::size_t operator()(const char* str) const { return hash_type{}(str); }
-        std::size_t operator()(std::string_view str) const { return hash_type{}(str); }
+        std::size_t operator()(const std::string_view str) const { return hash_type{}(str); }
         std::size_t operator()(std::string const& str) const { return hash_type{}(str); }
 
         bool operator()(const DictionaryEntry& lhs, const DictionaryEntry& rhs) const {
             return lhs.get(*dict) == rhs.get(*dict);
         }
-        bool operator()(const DictionaryEntry& lhs, std::string_view rhs) const {
+        bool operator()(const DictionaryEntry& lhs, const std::string_view rhs) const {
             return lhs.get(*dict) == rhs;
         }
-        bool operator()(std::string_view lhs, const DictionaryEntry& rhs) const {
+        bool operator()(const std::string_view lhs, const DictionaryEntry& rhs) const {
             return lhs == rhs.get(*dict);
         }
     };

@@ -3,6 +3,7 @@
 #include "common/data_chunk/sel_vector.h"
 #include "storage/store/column_chunk.h"
 #include "storage/store/dictionary_chunk.h"
+#include <storage/store/string_column.h>
 
 using namespace kuzu::common;
 
@@ -15,6 +16,12 @@ StringColumnChunk::StringColumnChunk(LogicalType dataType, uint64_t capacity,
       dictionaryChunk{std::make_unique<DictionaryChunk>(
           status == ColumnChunkStatus::IN_MEMORY ? 0 : capacity, enableCompression)},
       needFinalize{false} {}
+
+StringColumnChunk::StringColumnChunk(Column& column, node_group_idx_t nodeGroupIdx)
+    : ColumnChunk{column, nodeGroupIdx}, needFinalize{false} {
+    auto& stringColumn = ku_dynamic_cast<const Column&, const StringColumn&>(column);
+    dictionaryChunk = std::make_unique<DictionaryChunk>(stringColumn.getDictionary(), nodeGroupIdx);
+}
 
 void StringColumnChunk::resetToEmpty() {
     ColumnChunk::resetToEmpty();
@@ -176,7 +183,7 @@ void StringColumnChunk::finalize() {
 }
 
 template<>
-common::ku_string_t StringColumnChunk::getValue<common::ku_string_t>(offset_t) const {
+ku_string_t StringColumnChunk::getValue<ku_string_t>(offset_t) const {
     KU_UNREACHABLE;
 }
 

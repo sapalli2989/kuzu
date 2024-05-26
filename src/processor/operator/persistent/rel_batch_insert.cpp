@@ -131,9 +131,9 @@ std::vector<offset_t> RelBatchInsert::populateStartCSROffsetsAndLengths(ChunkedC
               numNodes == csrHeader.offset->getNumValues());
     std::vector<offset_t> gaps;
     gaps.resize(numNodes);
-    auto csrOffsets = (offset_t*)csrHeader.offset->getData();
-    auto csrLengths = (length_t*)csrHeader.length->getData();
-    std::fill(csrLengths, csrLengths + numNodes, 0);
+    auto csrOffsets = reinterpret_cast<offset_t*>(csrHeader.offset->getData());
+    auto csrLengths = reinterpret_cast<length_t*>(csrHeader.length->getData());
+    std::fill_n(csrLengths, numNodes, 0);
     // Calculate length for each node. Store the num of tuples of node i at csrLengths[i].
     for (auto& chunkedGroup : partition.getChunkedGroups()) {
         auto& offsetChunk = chunkedGroup->getColumnChunk(offsetColumnID);
@@ -202,7 +202,7 @@ void RelBatchInsert::appendNewNodeGroup(transaction::Transaction* transaction,
 }
 
 std::optional<offset_t> RelBatchInsert::checkRelMultiplicityConstraint(
-    const storage::ChunkedCSRHeader& csrHeader, const RelBatchInsertInfo& relInfo) {
+    const ChunkedCSRHeader& csrHeader, const RelBatchInsertInfo& relInfo) {
     auto relTableEntry =
         ku_dynamic_cast<catalog::TableCatalogEntry*, catalog::RelTableCatalogEntry*>(
             relInfo.tableEntry);

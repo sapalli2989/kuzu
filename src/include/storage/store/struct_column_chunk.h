@@ -12,8 +12,9 @@ class StructColumnChunk final : public ColumnChunk {
 public:
     StructColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
         bool enableCompression);
+    StructColumnChunk(Column& column, common::node_group_idx_t nodeGroupIdx);
 
-    inline ColumnChunk* getChild(common::vector_idx_t childIdx) {
+    ColumnChunk* getChild(common::vector_idx_t childIdx) const {
         KU_ASSERT(childIdx < childChunks.size());
         return childChunks[childIdx].get();
     }
@@ -22,8 +23,8 @@ public:
 
 protected:
     void append(ColumnChunk* other, common::offset_t startPosInOtherChunk,
-        uint32_t numValuesToAppend) final;
-    void append(common::ValueVector* vector, const common::SelectionVector& selVector) final;
+        uint32_t numValuesToAppend) override;
+    void append(common::ValueVector* vector, const common::SelectionVector& selVector) override;
 
     void lookup(common::offset_t offsetInChunk, common::ValueVector& output,
         common::sel_t posInOutputVector) const override;

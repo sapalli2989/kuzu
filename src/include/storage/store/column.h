@@ -37,19 +37,6 @@ class Column {
     friend class RelTableData;
 
 public:
-    struct ChunkState {
-        explicit ChunkState() = default;
-        ChunkState(ColumnChunkMetadata metadata, uint64_t numValuesPerPage)
-            : metadata{std::move(metadata)}, numValuesPerPage{numValuesPerPage} {}
-
-        ColumnChunkMetadata metadata;
-        uint64_t numValuesPerPage = UINT64_MAX;
-        common::node_group_idx_t nodeGroupIdx = common::INVALID_NODE_GROUP_IDX;
-        std::unique_ptr<ChunkState> nullState = nullptr;
-        // Used for struct/list/string columns.
-        std::vector<ChunkState> childrenStates;
-    };
-
     Column(std::string name, common::LogicalType dataType, const MetadataDAHInfo& metaDAHeaderInfo,
         BMFileHandle* dataFH, BMFileHandle* metadataFH, BufferManager* bufferManager, WAL* wal,
         transaction::Transaction* transaction, bool enableCompression,
@@ -122,8 +109,8 @@ public:
         return metadataDA->get(nodeGroupIdx, transaction);
     }
     DiskArray<ColumnChunkMetadata>* getMetadataDA() const { return metadataDA.get(); }
-
     std::string getName() const { return name; }
+    bool isCompressed() const { return enableCompression; }
 
     virtual void scan(transaction::Transaction* transaction, const ChunkState& state,
         common::offset_t startOffsetInGroup, common::offset_t endOffsetInGroup, uint8_t* result);

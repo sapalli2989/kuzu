@@ -13,30 +13,30 @@ class Column;
 class ChunkedNodeGroup {
 public:
     explicit ChunkedNodeGroup(std::vector<std::unique_ptr<ColumnChunk>> chunks)
-        : chunks{std::move(chunks)} {}
+        : chunks{std::move(chunks)}, nodeGroupIdx{common::INVALID_NODE_GROUP_IDX}, numRows{0} {}
     ChunkedNodeGroup(const std::vector<common::LogicalType>& columnTypes, bool enableCompression,
         uint64_t capacity);
     ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& columns, bool enableCompression);
     DELETE_COPY_DEFAULT_MOVE(ChunkedNodeGroup);
     virtual ~ChunkedNodeGroup() = default;
 
-    inline uint64_t getNodeGroupIdx() const { return nodeGroupIdx; }
-    inline common::vector_idx_t getNumColumns() const { return chunks.size(); }
-    inline const ColumnChunk& getColumnChunk(common::column_id_t columnID) const {
+    uint64_t getNodeGroupIdx() const { return nodeGroupIdx; }
+    common::vector_idx_t getNumColumns() const { return chunks.size(); }
+    const ColumnChunk& getColumnChunk(common::column_id_t columnID) const {
         KU_ASSERT(columnID < chunks.size());
         return *chunks[columnID];
     }
-    inline ColumnChunk& getColumnChunkUnsafe(common::column_id_t columnID) {
+    ColumnChunk& getColumnChunkUnsafe(common::column_id_t columnID) const {
         KU_ASSERT(columnID < chunks.size());
         return *chunks[columnID];
     }
-    inline std::vector<std::unique_ptr<ColumnChunk>>& getColumnChunksUnsafe() { return chunks; }
-    inline bool isFull() const { return numRows == common::StorageConstants::NODE_GROUP_SIZE; }
+    std::vector<std::unique_ptr<ColumnChunk>>& getColumnChunksUnsafe() { return chunks; }
+    bool isFull() const { return numRows == common::StorageConstants::NODE_GROUP_SIZE; }
 
     void resetToEmpty();
     void setAllNull();
     void setNumRows(common::offset_t numRows);
-    inline common::row_idx_t getNumRows() const { return numRows; }
+    common::row_idx_t getNumRows() const { return numRows; }
     void resizeChunks(uint64_t newSize);
 
     uint64_t append(const std::vector<common::ValueVector*>& columnVectors,
@@ -51,9 +51,8 @@ public:
 
     void finalize(uint64_t nodeGroupIdx_);
 
-    virtual inline void writeToColumnChunk(common::vector_idx_t chunkIdx,
-        common::vector_idx_t vectorIdx, const std::vector<std::unique_ptr<ColumnChunk>>& data,
-        ColumnChunk& offsetChunk) {
+    virtual void writeToColumnChunk(common::vector_idx_t chunkIdx, common::vector_idx_t vectorIdx,
+        const std::vector<std::unique_ptr<ColumnChunk>>& data, ColumnChunk& offsetChunk) {
         chunks[chunkIdx]->write(data[vectorIdx].get(), &offsetChunk, common::RelMultiplicity::ONE);
     }
 
@@ -81,13 +80,13 @@ struct ChunkedCSRHeader {
     bool sanityCheck() const;
     void copyFrom(const ChunkedCSRHeader& other) const;
     void fillDefaultValues(common::offset_t newNumValues) const;
-    inline void setNumValues(common::offset_t numValues) const {
+    void setNumValues(common::offset_t numValues) const {
         offset->setNumValues(numValues);
         length->setNumValues(numValues);
     }
 };
 
-class ChunkedCSRNodeGroup : public ChunkedNodeGroup {
+class ChunkedCSRNodeGroup final : public ChunkedNodeGroup {
 public:
     ChunkedCSRNodeGroup(const std::vector<common::LogicalType>& columnTypes,
         bool enableCompression);
@@ -96,7 +95,7 @@ public:
     ChunkedCSRHeader& getCSRHeader() { return csrHeader; }
     const ChunkedCSRHeader& getCSRHeader() const { return csrHeader; }
 
-    inline void writeToColumnChunk(common::vector_idx_t chunkIdx, common::vector_idx_t vectorIdx,
+    void writeToColumnChunk(common::vector_idx_t chunkIdx, common::vector_idx_t vectorIdx,
         const std::vector<std::unique_ptr<ColumnChunk>>& data, ColumnChunk& offsetChunk) override {
         chunks[chunkIdx]->write(data[vectorIdx].get(), &offsetChunk, common::RelMultiplicity::MANY);
     }
@@ -106,9 +105,9 @@ private:
 };
 
 struct NodeGroupFactory {
-    static inline std::unique_ptr<ChunkedNodeGroup> createNodeGroup(
-        common::ColumnDataFormat dataFormat, const std::vector<common::LogicalType>& columnTypes,
-        bool enableCompression, uint64_t capacity = common::StorageConstants::NODE_GROUP_SIZE) {
+    static std::unique_ptr<ChunkedNodeGroup> createNodeGroup(common::ColumnDataFormat dataFormat,
+        const std::vector<common::LogicalType>& columnTypes, bool enableCompression,
+        uint64_t capacity = common::StorageConstants::NODE_GROUP_SIZE) {
         return dataFormat == common::ColumnDataFormat::REGULAR ?
                    std::make_unique<ChunkedNodeGroup>(columnTypes, enableCompression, capacity) :
                    std::make_unique<ChunkedCSRNodeGroup>(columnTypes, enableCompression);

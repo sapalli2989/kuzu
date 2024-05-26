@@ -4,6 +4,7 @@
 #include "common/types/internal_id_t.h"
 #include "common/types/types.h"
 #include "storage/store/column_chunk.h"
+#include <storage/store/struct_column.h>
 
 using namespace kuzu::common;
 
@@ -20,6 +21,16 @@ StructColumnChunk::StructColumnChunk(LogicalType dataType, uint64_t capacity,
     for (auto i = 0u; i < fieldTypes.size(); i++) {
         childChunks[i] = ColumnChunkFactory::createColumnChunk(*fieldTypes[i].copy(), status,
             enableCompression, capacity);
+    }
+}
+
+StructColumnChunk::StructColumnChunk(Column& column, node_group_idx_t nodeGroupIdx)
+    : ColumnChunk{column, nodeGroupIdx} {
+    auto& structColumn = ku_dynamic_cast<const Column&, const StructColumn&>(column);
+    childChunks.resize(structColumn.getNumChildren());
+    for (auto i = 0u; i < structColumn.getNumChildren(); i++) {
+        childChunks[i] =
+            ColumnChunkFactory::createColumnChunk(*structColumn.getChild(i), nodeGroupIdx);
     }
 }
 

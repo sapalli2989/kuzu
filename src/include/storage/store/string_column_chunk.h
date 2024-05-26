@@ -13,9 +13,10 @@ class StringColumnChunk final : public ColumnChunk {
 public:
     StringColumnChunk(common::LogicalType dataType, uint64_t capacity, ColumnChunkStatus status,
         bool enableCompression);
+    StringColumnChunk(Column& column, common::node_group_idx_t nodeGroupIdx);
 
-    void resetToEmpty() final;
-    void append(common::ValueVector* vector, const common::SelectionVector& selVector) final;
+    void resetToEmpty() override;
+    void append(common::ValueVector* vector, const common::SelectionVector& selVector) override;
     void append(ColumnChunk* other, common::offset_t startPosInOtherChunk,
         uint32_t numValuesToAppend) override;
 
@@ -32,7 +33,7 @@ public:
         common::offset_t dstOffsetInChunk, common::offset_t numValuesToCopy) override;
 
     template<typename T>
-    T getValue(common::offset_t /*pos*/) const {
+    T getValue(common::offset_t) const {
         KU_UNREACHABLE;
     }
 
@@ -41,8 +42,8 @@ public:
         return dictionaryChunk->getStringLength(index);
     }
 
-    inline DictionaryChunk& getDictionaryChunk() { return *dictionaryChunk; }
-    inline const DictionaryChunk& getDictionaryChunk() const { return *dictionaryChunk; }
+    DictionaryChunk& getDictionaryChunk() { return *dictionaryChunk; }
+    const DictionaryChunk& getDictionaryChunk() const { return *dictionaryChunk; }
 
     void finalize() override;
 

@@ -27,6 +27,7 @@ public:
     void rollbackInMemory() override;
     void prepareCommit() override;
 
+    common::vector_idx_t getNumChildren() const { return childColumns.size(); }
     Column* getChild(common::vector_idx_t childIdx) const {
         KU_ASSERT(childIdx < childColumns.size());
         return childColumns[childIdx].get();

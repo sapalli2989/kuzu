@@ -9,7 +9,7 @@
 namespace kuzu {
 namespace processor {
 
-struct RelBatchInsertInfo final : public BatchInsertInfo {
+struct RelBatchInsertInfo final : BatchInsertInfo {
     common::RelDataDirection direction;
     uint64_t partitioningIdx;
     common::column_id_t offsetColumnID;
@@ -26,12 +26,12 @@ struct RelBatchInsertInfo final : public BatchInsertInfo {
           partitioningIdx{other.partitioningIdx}, offsetColumnID{other.offsetColumnID},
           columnTypes{common::LogicalType::copy(other.columnTypes)} {}
 
-    inline std::unique_ptr<BatchInsertInfo> copy() const override {
+    std::unique_ptr<BatchInsertInfo> copy() const override {
         return std::make_unique<RelBatchInsertInfo>(*this);
     }
 };
 
-struct RelBatchInsertLocalState final : public BatchInsertLocalState {
+struct RelBatchInsertLocalState final : BatchInsertLocalState {
     common::partition_idx_t nodeGroupIdx = common::INVALID_NODE_GROUP_IDX;
 };
 
@@ -46,7 +46,7 @@ public:
               paramsString},
           partitionerSharedState{std::move(partitionerSharedState)} {}
 
-    inline bool isSource() const override { return true; }
+    bool isSource() const override { return true; }
 
     void initLocalStateInternal(ResultSet* resultSet_, ExecutionContext* context) override;
     void initGlobalStateInternal(ExecutionContext* context) override;
@@ -54,7 +54,7 @@ public:
     void executeInternal(ExecutionContext* context) override;
     void finalize(ExecutionContext* context) override;
 
-    inline std::unique_ptr<PhysicalOperator> clone() override {
+    std::unique_ptr<PhysicalOperator> clone() override {
         return std::make_unique<RelBatchInsert>(info->copy(), partitionerSharedState, sharedState,
             resultSetDescriptor->copy(), id, paramsString);
     }

@@ -47,13 +47,13 @@ void ChunkedCSRHeader::fillDefaultValues(offset_t newNumValues) const {
         offset->getNumValues() >= newNumValues && length->getNumValues() == offset->getNumValues());
 }
 
-ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<common::LogicalType>& columnTypes,
+ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<LogicalType>& columnTypes,
     bool enableCompression, uint64_t capacity)
     : nodeGroupIdx{UINT64_MAX}, numRows{0} {
     chunks.reserve(columnTypes.size());
     for (auto& type : columnTypes) {
-        chunks.push_back(
-            ColumnChunkFactory::createColumnChunk(*type.copy(), enableCompression, capacity));
+        chunks.push_back(ColumnChunkFactory::createColumnChunk(*type.copy(),
+            ColumnChunkStatus::IN_MEMORY, enableCompression, capacity));
     }
 }
 
@@ -62,8 +62,9 @@ ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& c
     : nodeGroupIdx{UINT64_MAX}, numRows{0} {
     chunks.reserve(columns.size());
     for (auto columnID = 0u; columnID < columns.size(); columnID++) {
-        chunks.push_back(ColumnChunkFactory::createColumnChunk(
-            *columns[columnID]->getDataType().copy(), enableCompression));
+        chunks.push_back(
+            ColumnChunkFactory::createColumnChunk(*columns[columnID]->getDataType().copy(),
+                ColumnChunkStatus::IN_MEMORY, enableCompression));
     }
 }
 
@@ -81,7 +82,7 @@ void ChunkedNodeGroup::setAllNull() {
     }
 }
 
-void ChunkedNodeGroup::setNumRows(common::offset_t numRows_) {
+void ChunkedNodeGroup::setNumRows(offset_t numRows_) {
     for (auto& chunk : chunks) {
         chunk->setNumValues(numRows_);
     }
@@ -99,12 +100,11 @@ uint64_t ChunkedNodeGroup::append(const std::vector<ValueVector*>& columnVectors
     auto numValuesToAppendInChunk =
         std::min(numValuesToAppend, StorageConstants::NODE_GROUP_SIZE - numRows);
     auto serialSkip = 0u;
-    //    auto slicedSelVector = selVector.slice(numValuesToAppendInChunk);
     auto originalSize = selVector.getSelSize();
     selVector.setSelSize(numValuesToAppendInChunk);
     for (auto i = 0u; i < chunks.size(); i++) {
         auto chunk = chunks[i].get();
-        if (chunk->getDataType().getLogicalTypeID() == common::LogicalTypeID::SERIAL) {
+        if (chunk->getDataType().getLogicalTypeID() == LogicalTypeID::SERIAL) {
             chunk->setNumValues(chunk->getNumValues() + numValuesToAppendInChunk);
             serialSkip++;
             continue;
@@ -114,7 +114,6 @@ uint64_t ChunkedNodeGroup::append(const std::vector<ValueVector*>& columnVectors
         chunk->append(columnVector, selVector);
     }
     selVector.setSelSize(originalSize);
-    //    selVector.selectedSize = originalSize;
     numRows += numValuesToAppendInChunk;
     return numValuesToAppendInChunk;
 }
@@ -161,10 +160,10 @@ void ChunkedNodeGroup::finalize(uint64_t nodeGroupIdx_) {
 }
 
 ChunkedCSRHeader::ChunkedCSRHeader(bool enableCompression, uint64_t capacity) {
-    offset =
-        ColumnChunkFactory::createColumnChunk(*LogicalType::UINT64(), enableCompression, capacity);
-    length =
-        ColumnChunkFactory::createColumnChunk(*LogicalType::UINT64(), enableCompression, capacity);
+    offset = ColumnChunkFactory::createColumnChunk(*LogicalType::UINT64(),
+        ColumnChunkStatus::IN_MEMORY, enableCompression, capacity);
+    length = ColumnChunkFactory::createColumnChunk(*LogicalType::UINT64(),
+        ColumnChunkStatus::IN_MEMORY, enableCompression, capacity);
 }
 
 offset_t ChunkedCSRHeader::getStartCSROffset(offset_t nodeOffset) const {

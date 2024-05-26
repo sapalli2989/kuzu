@@ -90,7 +90,7 @@ bool NodeTable::scanUnCommitted(NodeTableScanState& scanState) {
 
 bool NodeTable::scanCommitted(Transaction* transaction, NodeTableScanState& scanState) {
     KU_ASSERT(scanState.source == TableScanSource::COMMITTED);
-    auto& dataScanState =
+    const auto& dataScanState =
         ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*scanState.dataScanState);
     // Fill nodeIDVector and set selVector from deleted node offsets.
     const auto startNodeOffset = StorageUtils::getStartOffsetOfNodeGroup(scanState.nodeGroupIdx) +
@@ -106,8 +106,7 @@ bool NodeTable::scanCommitted(Transaction* transaction, NodeTableScanState& scan
         dataScanState.vectorIdx, dataScanState.numRowsToScan);
 
     KU_ASSERT(scanState.source == TableScanSource::COMMITTED);
-    tableData->scan(transaction, *scanState.dataScanState, *scanState.nodeIDVector,
-        scanState.outputVectors);
+    tableData->scan(transaction, scanState, *scanState.nodeIDVector, scanState.outputVectors);
 
     // Scan updates from local storage.
     if (scanState.localNodeGroup) {

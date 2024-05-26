@@ -5,8 +5,8 @@
 #include "storage/local_storage/local_node_table.h"
 #include "storage/local_storage/local_table.h"
 #include "storage/stats/nodes_store_statistics.h"
+#include "storage/store/node_group.h"
 #include "storage/store/node_table.h"
-#include "storage/store/table.h"
 #include "transaction/transaction.h"
 
 using namespace kuzu::catalog;
@@ -28,52 +28,60 @@ bool NodeDataScanState::nextVector() {
 }
 
 NodeTableData::NodeTableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
-    TableCatalogEntry* tableEntry, BufferManager* bufferManager, WAL* wal,
+    const TableCatalogEntry* tableEntry, BufferManager* bufferManager, WAL* wal,
     const std::vector<Property>& properties, TablesStatistics* tablesStatistics,
     bool enableCompression)
-    : TableData{dataFH, metadataFH, tableEntry, bufferManager, wal, enableCompression} {
+    : TableData{dataFH, metadataFH, tableEntry->getTableID(), tableEntry->getName(), bufferManager,
+          wal, enableCompression} {
     const auto maxColumnID =
         std::max_element(properties.begin(), properties.end(), [](auto& a, auto& b) {
             return a.getColumnID() < b.getColumnID();
         })->getColumnID();
-    std::vector<std::unique_ptr<DiskArray<ColumnChunkMetadata>>> columnMetadataDAs;
-    columnMetadataDAs.resize(maxColumnID + 1);
-    //    columns.resize(maxColumnID + 1);
+    columns.resize(maxColumnID + 1);
     for (auto i = 0u; i < properties.size(); i++) {
         auto& property = properties[i];
         const auto metadataDAHInfo = dynamic_cast<NodesStoreStatsAndDeletedIDs*>(tablesStatistics)
                                          ->getMetadataDAHInfo(&DUMMY_WRITE_TRANSACTION, tableID, i);
-        columnMetadataDAs[property.getColumnID()] =
-            std::make_unique<DiskArray<ColumnChunkMetadata>>(*metadataFH,
-                DBFileID::newMetadataFileID(), metadataDAHInfo->dataDAHPageIdx, bufferManager, wal,
-                &DUMMY_WRITE_TRANSACTION);
-        //        const auto columnName =
-        //            StorageUtils::getColumnName(property.getName(),
-        //            StorageUtils::ColumnType::DEFAULT, "");
-        //        columns[property.getColumnID()] = ColumnFactory::createColumn(columnName,
-        //            *property.getDataType()->copy(), *metadataDAHInfo, dataFH, metadataFH,
-        //            bufferManager, wal, &DUMMY_WRITE_TRANSACTION, enableCompression);
+        const auto columnName =
+            StorageUtils::getColumnName(property.getName(), StorageUtils::ColumnType::DEFAULT, "");
+        columns[property.getColumnID()] = ColumnFactory::createColumn(columnName,
+            *property.getDataType()->copy(), *metadataDAHInfo, dataFH, metadataFH, bufferManager,
+            wal, &DUMMY_WRITE_TRANSACTION, enableCompression);
+    }
+    loadNodeGroups(properties);
+}
+
+void NodeTableData::loadNodeGroups(const std::vector<Property>& properties) {
+    const auto numNodeGroups = getColumn(0)->getNumNodeGroups(&DUMMY_READ_TRANSACTION);
+    for (auto i = 0u; i < numNodeGroups; i++) {
+        std::vector<std::unique_ptr<ColumnChunk>> chunks(columns.size());
+        for (auto& property : properties) {
+            const auto columnID = property.getColumnID();
+            chunks[columnID] = std::make_unique<ColumnChunk>(*getColumn(property.getColumnID()), i);
+        }
+        nodeGroups.emplace_back(std::move(chunks));
     }
 }
 
 void NodeTableData::initializeScanState(Transaction* transaction, TableScanState& scanState) const {
     auto& dataScanState =
         ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*scanState.dataScanState);
-    KU_ASSERT(dataScanState.chunkStates.size() == scanState.columnIDs.size());
+    KU_ASSERT(dataScanState.chunkStates.size() == scanState.columnIDs.size() &&
+              scanState.nodeGroupIdx < nodeGroups.size());
     if (scanState.dataScanState) {
-        initializeColumnScanStates(transaction, dataScanState, scanState.nodeGroupIdx);
+        initializeColumnScanStates(transaction, scanState, scanState.nodeGroupIdx);
     }
     if (transaction->isWriteTransaction()) {
         initializeLocalNodeReadState(transaction, scanState, scanState.nodeGroupIdx);
     }
     dataScanState.vectorIdx = INVALID_VECTOR_IDX;
-    dataScanState.numRowsInNodeGroup =
-        columns[0]->getMetadata(scanState.nodeGroupIdx, TransactionType::READ_ONLY).numValues;
+    dataScanState.numRowsInNodeGroup = nodeGroups[scanState.nodeGroupIdx].getNumRows();
 }
 
-void NodeTableData::initializeColumnScanStates(Transaction* transaction,
-    NodeDataScanState& scanState, node_group_idx_t nodeGroupIdx) const {
-    auto& dataReadState = ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(scanState);
+void NodeTableData::initializeColumnScanStates(Transaction* transaction, TableScanState& scanState,
+    node_group_idx_t nodeGroupIdx) const {
+    auto& dataReadState =
+        ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*scanState.dataScanState);
     for (auto i = 0u; i < scanState.columnIDs.size(); i++) {
         if (scanState.columnIDs[i] != INVALID_COLUMN_ID) {
             getColumn(scanState.columnIDs[i])
@@ -118,23 +126,16 @@ void NodeTableData::initializeLocalNodeReadState(Transaction* transaction,
     }
 }
 
-void NodeTableData::scan(Transaction* transaction, TableDataScanState& scanState,
+void NodeTableData::scan(Transaction* transaction, TableScanState& scanState,
     ValueVector& nodeIDVector, const std::vector<ValueVector*>& outputVectors) {
-    auto& nodeScanState =
-        ku_dynamic_cast<const TableDataScanState&, const NodeDataScanState&>(scanState);
     for (auto i = 0u; i < scanState.columnIDs.size(); i++) {
-        if (scanState.columnIDs[i] == INVALID_COLUMN_ID) {
-            outputVectors[i]->setAllNull();
-        } else {
-            KU_ASSERT(scanState.columnIDs[i] < columns.size());
-            columns[scanState.columnIDs[i]]->scan(transaction, nodeScanState.chunkStates[i],
-                nodeScanState.vectorIdx, nodeScanState.numRowsToScan, &nodeIDVector,
-                outputVectors[i]);
-        }
+        KU_ASSERT(
+            scanState.columnIDs[i] == INVALID_COLUMN_ID || scanState.columnIDs[i] < columns.size());
     }
+    nodeGroups[scanState.nodeGroupIdx].scan(transaction, scanState, nodeIDVector, outputVectors);
 }
 
-void NodeTableData::lookup(Transaction* transaction, TableDataScanState& readState,
+void NodeTableData::lookup(Transaction* transaction, TableScanState& readState,
     const ValueVector& nodeIDVector, const std::vector<ValueVector*>& outputVectors) {
     for (auto columnIdx = 0u; columnIdx < readState.columnIDs.size(); columnIdx++) {
         const auto columnID = readState.columnIDs[columnIdx];
@@ -148,7 +149,7 @@ void NodeTableData::lookup(Transaction* transaction, TableDataScanState& readSta
         } else {
             KU_ASSERT(readState.columnIDs[columnIdx] < columns.size());
             auto& nodeDataReadState =
-                ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(readState);
+                ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*readState.dataScanState);
             // TODO: Remove `const_cast` on nodeIDVector.
             columns[readState.columnIDs[columnIdx]]->lookup(transaction,
                 nodeDataReadState.chunkStates[columnIdx], const_cast<ValueVector*>(&nodeIDVector),
@@ -162,10 +163,16 @@ void NodeTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup
         auto& columnChunk = nodeGroup->getColumnChunkUnsafe(columnID);
         KU_ASSERT(columnID < columns.size());
         auto column = columns[columnID].get();
-        Column::ChunkState state;
+        ChunkState state;
         column->initChunkState(transaction, nodeGroup->getNodeGroupIdx(), state);
         columns[columnID]->append(&columnChunk, state);
     }
+}
+
+offset_t NodeTableData::getNumTuplesInNodeGroup(const Transaction* transaction,
+    node_group_idx_t nodeGroupIdx) const {
+    KU_ASSERT(nodeGroupIdx < getNumCommittedNodeGroups());
+    return nodeGroups[nodeGroupIdx].getNumRows();
 }
 
 void NodeTableData::prepareLocalNodeGroupToCommit(node_group_idx_t nodeGroupIdx,
