@@ -3,7 +3,7 @@
 #include "common/data_chunk/sel_vector.h"
 #include "storage/store/column_chunk.h"
 #include "storage/store/dictionary_chunk.h"
-#include <storage/store/string_column.h>
+#include "storage/store/string_column.h"
 
 using namespace kuzu::common;
 

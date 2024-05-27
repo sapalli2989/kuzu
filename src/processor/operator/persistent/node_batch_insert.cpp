@@ -26,7 +26,7 @@ void NodeBatchInsertSharedState::initPKIndex(ExecutionContext*) {
     uint64_t numRows;
     if (readerSharedState != nullptr) {
         KU_ASSERT(distinctSharedState == nullptr);
-        auto scanSharedState =
+        const auto scanSharedState =
             readerSharedState->funcState->ptrCast<function::BaseScanSharedState>();
         numRows = scanSharedState->getNumRows();
     } else {
@@ -209,7 +209,7 @@ void NodeBatchInsert::copyToNodeGroup(transaction::Transaction* transaction) {
 }
 
 void NodeBatchInsert::writeAndResetNodeGroup(transaction::Transaction* transaction,
-    node_group_idx_t nodeGroupIdx, std::unique_ptr<storage::ChunkedNodeGroup>& nodeGroup,
+    node_group_idx_t nodeGroupIdx, std::unique_ptr<ChunkedNodeGroup>& nodeGroup,
     std::optional<IndexBuilder>& indexBuilder) {
     auto nodeSharedState =
         ku_dynamic_cast<BatchInsertSharedState*, NodeBatchInsertSharedState*>(sharedState.get());

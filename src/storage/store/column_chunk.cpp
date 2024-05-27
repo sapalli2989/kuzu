@@ -1,7 +1,5 @@
 #include "storage/store/column_chunk.h"
 
-#include <iostream>
-
 #include "common/data_chunk/sel_vector.h"
 #include "common/exception/copy.h"
 #include "common/types/internal_id_t.h"
@@ -165,7 +163,7 @@ ColumnChunk::ColumnChunk(Column& column, node_group_idx_t nodeGroupIdx)
     : dataType{std::move(*column.getDataType().copy())},
       numBytesPerValue{getDataTypeSizeInChunk(this->dataType)}, status{ColumnChunkStatus::ON_DISK},
       enableCompression(column.isCompressed()), column{&column} {
-    metadata = column.getMetadata(nodeGroupIdx, TransactionType::READ_ONLY);
+    metadata = column.getMetadata(nodeGroupIdx, TransactionType::WRITE);
     numValues = metadata.numValues;
     if (column.getNullColumn()) {
         nullChunk = std::make_unique<NullColumnChunk>(*column.getNullColumn(), nodeGroupIdx);
@@ -578,7 +576,6 @@ public:
             auto pos = selVector[i];
             KU_ASSERT(relIDsInVector[pos].tableID == commonTableID);
             nullChunk->setNull(startPosInChunk + i, vector->isNull(pos));
-            std::cout << "Internal ID: " << getValue<offset_t>(startPosInChunk + i) << std::endl;
             memcpy(buffer.get() + (startPosInChunk + i) * numBytesPerValue,
                 &relIDsInVector[pos].offset, numBytesPerValue);
         }
@@ -590,7 +587,6 @@ public:
         for (auto i = 0u; i < selVector.getSelSize(); i++) {
             auto pos = selVector[i];
             nullChunk->setNull(startPosInChunk + i, vector->isNull(pos));
-            std::cout << "Internal ID int64: " << vector->getValue<offset_t>(pos) << std::endl;
             memcpy(buffer.get() + (startPosInChunk + i) * numBytesPerValue,
                 &vector->getValue<offset_t>(pos), numBytesPerValue);
         }

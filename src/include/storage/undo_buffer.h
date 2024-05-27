@@ -8,24 +8,25 @@ namespace catalog {
 class CatalogEntry;
 class CatalogSet;
 } // namespace catalog
+
 namespace main {
 class ClientContext;
-}
+} // namespace main
+
 namespace storage {
 
 // TODO(Guodong): This should be reworked to use MemoryManager for memory allocaiton.
-//                For now, we use malloc to get around the limitation of 256KB from MM.
 class UndoMemoryBuffer {
 public:
-    static constexpr const uint64_t UNDO_MEMORY_BUFFER_SIZE =
-        common::BufferPoolConstants::PAGE_4KB_SIZE;
+    static constexpr uint64_t UNDO_MEMORY_BUFFER_SIZE = common::BufferPoolConstants::PAGE_4KB_SIZE;
 
     explicit UndoMemoryBuffer(uint64_t size) : size{size} {
         data = std::make_unique<uint8_t[]>(size);
         currentPosition = 0;
     }
 
-    uint8_t* getDataUnsafe() { return data.get(); }
+    // TODO(Guodong): Change return type to std::span.
+    uint8_t* getDataUnsafe() const { return data.get(); }
     uint8_t const* getData() const { return data.get(); }
     uint64_t getSize() const { return size; }
     uint64_t getCurrentPosition() const { return currentPosition; }
@@ -61,12 +62,15 @@ class UndoBuffer {
 
 public:
     enum class UndoEntryType : uint16_t {
-        CATALOG_ENTRY,
+        CATALOG_ENTRY = 0,
+        BATCH_INSERT = 1,
     };
 
     explicit UndoBuffer(main::ClientContext& clientContext);
 
     void createCatalogEntry(catalog::CatalogSet& catalogSet, catalog::CatalogEntry& catalogEntry);
+    void createBatchInsert(common::table_id_t tableID, common::offset_t startOffset,
+        common::offset_t numRows, common::transaction_t transactionID);
 
     void commit(common::transaction_t commitTS);
     void rollback();

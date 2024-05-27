@@ -175,13 +175,13 @@ protected:
 template<>
 inline void ColumnChunk::setValue(bool val, common::offset_t pos) {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
-    common::NullMask::setNull(reinterpret_cast<uint64_t*>(buffer.get()), pos, val);
+    common::NullMask::setNull((uint64_t*)buffer.get(), pos, val);
 }
 
 template<>
 inline bool ColumnChunk::getValue(common::offset_t pos) const {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
-    return common::NullMask::isNull(reinterpret_cast<uint64_t*>(buffer.get()), pos);
+    return common::NullMask::isNull((uint64_t*)buffer.get(), pos);
 }
 
 // Stored as bitpacked booleans in-memory and on-disk
@@ -238,8 +238,8 @@ public:
 
     void copyFromBuffer(uint64_t* srcBuffer, uint64_t srcOffset, uint64_t dstOffset,
         uint64_t numBits, bool invert = false) {
-        if (common::NullMask::copyNullMask(srcBuffer, srcOffset,
-                reinterpret_cast<uint64_t*>(buffer.get()), dstOffset, numBits, invert)) {
+        if (common::NullMask::copyNullMask(srcBuffer, srcOffset, (uint64_t*)buffer.get(), dstOffset,
+                numBits, invert)) {
             mayHaveNullValue = true;
         }
     }

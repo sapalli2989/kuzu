@@ -4,7 +4,7 @@
 #include "common/types/internal_id_t.h"
 #include "common/types/types.h"
 #include "storage/store/column_chunk.h"
-#include <storage/store/struct_column.h>
+#include "storage/store/struct_column.h"
 
 using namespace kuzu::common;
 

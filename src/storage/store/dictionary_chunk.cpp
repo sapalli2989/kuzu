@@ -89,7 +89,16 @@ std::string_view DictionaryChunk::getString(string_index_t index) const {
 }
 
 bool DictionaryChunk::sanityCheck() const {
-    return offsetChunk->getNumValues() <= stringDataChunk->getNumValues();
+    string_offset_t maxOffset = 0;
+    for (auto i = 0u; i < offsetChunk->getNumValues(); i++) {
+        if (offsetChunk->getValue<string_offset_t>(i) > maxOffset) {
+            maxOffset = offsetChunk->getValue<string_offset_t>(i);
+        }
+    }
+    if (maxOffset > stringDataChunk->getNumValues()) {
+        return false;
+    }
+    return maxOffset <= stringDataChunk->getNumValues();
 }
 
 } // namespace storage

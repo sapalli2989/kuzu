@@ -45,12 +45,12 @@ public:
         LocalTableData* localTable) override;
 
     common::node_group_idx_t getNumCommittedNodeGroups() const override {
-        return nodeGroups.size();
+        return columns[0]->getNumCommittedNodeGroups();
     }
 
-    common::node_group_idx_t getNumNodeGroups(const transaction::Transaction*) const {
+    common::node_group_idx_t getNumNodeGroups(const transaction::Transaction* transaction) const {
         // TODO(Guodong): FIX-ME. Take transaction into consideration.
-        return nodeGroups.size();
+        return columns[0]->getNumNodeGroups(transaction);
     }
     common::offset_t getNumTuplesInNodeGroup(const transaction::Transaction* transaction,
         common::node_group_idx_t nodeGroupIdx) const;
@@ -67,12 +67,11 @@ private:
         const common::ValueVector& nodeIDVector,
         const std::vector<common::ValueVector*>& outputVectors) override;
 
-    void append(transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx,
-        LocalNodeGroup* localNodeGroup);
-    void merge(transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx,
-        LocalNodeGroup* nodeGroup);
-
     static bool sanityCheckOnColumnNumValues(const NodeDataScanState& scanState);
+
+private:
+    std::mutex mtx;
+    common::offset_t nextNodeOffset;
 };
 
 } // namespace storage

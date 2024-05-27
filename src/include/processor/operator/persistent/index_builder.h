@@ -16,7 +16,7 @@
 namespace kuzu {
 namespace processor {
 
-const size_t SHOULD_FLUSH_QUEUE_SIZE = 32;
+constexpr size_t SHOULD_FLUSH_QUEUE_SIZE = 32;
 
 class IndexBuilderGlobalQueues {
 public:
@@ -104,12 +104,12 @@ class IndexBuilderSharedState {
 
 public:
     explicit IndexBuilderSharedState(storage::PrimaryKeyIndex* pkIndex) : globalQueues{pkIndex} {}
-    inline void consume() { globalQueues.consume(); }
-    inline void flush() { globalQueues.flushToDisk(); }
+    void consume() { globalQueues.consume(); }
+    void flush() const { globalQueues.flushToDisk(); }
 
-    inline void addProducer() { producers.fetch_add(1, std::memory_order_relaxed); }
+    void addProducer() { producers.fetch_add(1, std::memory_order_relaxed); }
     void quitProducer();
-    inline bool isDone() { return done.load(std::memory_order_relaxed); }
+    bool isDone() const { return done.load(std::memory_order_relaxed); }
 
 private:
     IndexBuilderGlobalQueues globalQueues;
@@ -147,7 +147,7 @@ public:
     DELETE_COPY_DEFAULT_MOVE(IndexBuilder);
     explicit IndexBuilder(std::shared_ptr<IndexBuilderSharedState> sharedState);
 
-    IndexBuilder clone() { return IndexBuilder(sharedState); }
+    IndexBuilder clone() const { return IndexBuilder(sharedState); }
 
     void insert(const storage::ColumnChunk& chunk, common::offset_t nodeOffset,
         common::offset_t numNodes);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "storage/store/column_chunk.h"
+#include "storage/store/chunked_node_group.h"
 
 namespace kuzu {
 namespace transaction {
@@ -13,6 +13,7 @@ class Column;
 struct TableScanState;
 class NodeGroup {
 public:
+    NodeGroup() {}
     explicit NodeGroup(std::vector<std::unique_ptr<ColumnChunk>> chunks)
         : chunks{std::move(chunks)} {}
 

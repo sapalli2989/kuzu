@@ -13,7 +13,8 @@ class Column;
 class ChunkedNodeGroup {
 public:
     explicit ChunkedNodeGroup(std::vector<std::unique_ptr<ColumnChunk>> chunks)
-        : chunks{std::move(chunks)}, nodeGroupIdx{common::INVALID_NODE_GROUP_IDX}, numRows{0} {}
+        : chunks{std::move(chunks)}, nodeGroupIdx{common::INVALID_NODE_GROUP_IDX}, startOffset{0},
+          numRows{0} {}
     ChunkedNodeGroup(const std::vector<common::LogicalType>& columnTypes, bool enableCompression,
         uint64_t capacity);
     ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& columns, bool enableCompression);
@@ -60,7 +61,10 @@ protected:
     std::vector<std::unique_ptr<ColumnChunk>> chunks;
 
 private:
+    // If all data are newly created by the same transaction, `newChunkedGroup` is the transaction.
+    common::transaction_t newChunkedGroup = common::INVALID_TRANSACTION;
     uint64_t nodeGroupIdx;
+    common::offset_t startOffset;
     common::row_idx_t numRows;
 };
 

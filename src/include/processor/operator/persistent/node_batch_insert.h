@@ -13,17 +13,18 @@
 namespace kuzu {
 namespace transaction {
 class Transaction;
-};
+} // namespace transaction
+
 namespace processor {
 struct ExecutionContext;
 
-struct NodeBatchInsertInfo final : public BatchInsertInfo {
+struct NodeBatchInsertInfo final : BatchInsertInfo {
     std::vector<DataPos> columnPositions;
     bool containSerial = false;
     std::vector<common::LogicalType> columnTypes;
 
     NodeBatchInsertInfo(catalog::TableCatalogEntry* tableEntry, bool compressionEnabled,
-        std::vector<DataPos> columnPositions, bool containSerial,
+        const std::vector<DataPos>& columnPositions, bool containSerial,
         std::vector<common::LogicalType> columnTypes)
         : BatchInsertInfo{tableEntry, compressionEnabled}, columnPositions{columnPositions},
           containSerial{containSerial}, columnTypes{std::move(columnTypes)} {}
@@ -33,12 +34,12 @@ struct NodeBatchInsertInfo final : public BatchInsertInfo {
           columnPositions{other.columnPositions}, containSerial{other.containSerial},
           columnTypes{common::LogicalType::copy(other.columnTypes)} {}
 
-    inline std::unique_ptr<BatchInsertInfo> copy() const override {
+    std::unique_ptr<BatchInsertInfo> copy() const override {
         return std::make_unique<NodeBatchInsertInfo>(*this);
     }
 };
 
-struct NodeBatchInsertSharedState final : public BatchInsertSharedState {
+struct NodeBatchInsertSharedState final : BatchInsertSharedState {
     // Primary key info
     storage::PrimaryKeyIndex* pkIndex;
     common::vector_idx_t pkColumnIdx;
@@ -49,8 +50,7 @@ struct NodeBatchInsertSharedState final : public BatchInsertSharedState {
     HashAggregateSharedState* distinctSharedState;
 
     uint64_t currentNodeGroupIdx;
-    // The sharedNodeGroup is to accumulate left data within local node groups in NodeBatchInsert
-    // ops.
+    // The sharedNodeGroup is to accumulate left data within local node groups in NodeBatchInsert.
     std::unique_ptr<storage::ChunkedNodeGroup> sharedNodeGroup;
 
     NodeBatchInsertSharedState(storage::Table* table, std::shared_ptr<FactorizedTable> fTable,
@@ -63,17 +63,17 @@ struct NodeBatchInsertSharedState final : public BatchInsertSharedState {
 
     void initPKIndex(ExecutionContext* context);
 
-    inline common::offset_t getNextNodeGroupIdx() {
+    common::offset_t getNextNodeGroupIdx() {
         std::unique_lock lck{mtx};
         return getNextNodeGroupIdxWithoutLock();
     }
 
-    inline uint64_t getCurNodeGroupIdx() const { return currentNodeGroupIdx; }
+    uint64_t getCurNodeGroupIdx() const { return currentNodeGroupIdx; }
 
-    inline common::offset_t getNextNodeGroupIdxWithoutLock() { return currentNodeGroupIdx++; }
+    common::offset_t getNextNodeGroupIdxWithoutLock() { return currentNodeGroupIdx++; }
 };
 
-struct NodeBatchInsertLocalState final : public BatchInsertLocalState {
+struct NodeBatchInsertLocalState final : BatchInsertLocalState {
     std::optional<IndexBuilder> localIndexBuilder;
 
     common::DataChunkState* columnState;
@@ -92,8 +92,9 @@ public:
         children.push_back(std::move(child));
     }
 
-    inline bool isParallel() const override {
-        auto nodeInfo = common::ku_dynamic_cast<BatchInsertInfo*, NodeBatchInsertInfo*>(info.get());
+    bool isParallel() const override {
+        auto nodeInfo =
+            common::ku_dynamic_cast<const BatchInsertInfo*, const NodeBatchInsertInfo*>(info.get());
         return !nodeInfo->containSerial;
     }
 
@@ -105,7 +106,7 @@ public:
 
     void finalize(ExecutionContext* context) override;
 
-    inline std::unique_ptr<PhysicalOperator> clone() override {
+    std::unique_ptr<PhysicalOperator> clone() override {
         return std::make_unique<NodeBatchInsert>(info->copy(), sharedState,
             resultSetDescriptor->copy(), children[0]->clone(), id, paramsString);
     }

@@ -133,7 +133,7 @@ std::vector<offset_t> RelBatchInsert::populateStartCSROffsetsAndLengths(ChunkedC
     gaps.resize(numNodes);
     auto csrOffsets = reinterpret_cast<offset_t*>(csrHeader.offset->getData());
     auto csrLengths = reinterpret_cast<length_t*>(csrHeader.length->getData());
-    std::fill_n(csrLengths, numNodes, 0);
+    std::fill(csrLengths, csrLengths + numNodes, 0);
     // Calculate length for each node. Store the num of tuples of node i at csrLengths[i].
     for (auto& chunkedGroup : partition.getChunkedGroups()) {
         auto& offsetChunk = chunkedGroup->getColumnChunk(offsetColumnID);
