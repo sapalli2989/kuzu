@@ -230,8 +230,11 @@ void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) 
 
     // 2. Populate hash index.
     std::vector<column_id_t> columnsToScan{pkColumnID};
+    auto state = std::make_shared<DataChunkState>();
     ValueVector nodeIDVector(*LogicalType::INTERNAL_ID());
+    nodeIDVector.setState(state);
     ValueVector pkVector(tableData->getColumn(pkColumnID)->getDataType());
+    pkVector.setState(state);
     std::vector<ValueVector*> outputVectors{&pkVector};
     auto scanState =
         std::make_unique<NodeTableScanState>(&nodeIDVector, columnsToScan, outputVectors);
@@ -291,9 +294,9 @@ void NodeTable::rollbackInMemory() {
 
 void NodeTable::insertPK(const ValueVector& nodeIDVector, const ValueVector& pkVector) const {
     for (auto i = 0u; i < nodeIDVector.state->getSelVector().getSelSize(); i++) {
-        const auto nodeIDPos = nodeIDVector.state->getSelVector()[0];
+        const auto nodeIDPos = nodeIDVector.state->getSelVector()[i];
         const auto offset = nodeIDVector.readNodeOffset(nodeIDPos);
-        auto pkPos = pkVector.state->getSelVector()[0];
+        auto pkPos = pkVector.state->getSelVector()[i];
         if (pkVector.isNull(pkPos)) {
             throw RuntimeException(ExceptionMessage::nullPKException());
         }

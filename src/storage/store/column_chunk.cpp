@@ -243,7 +243,7 @@ void ColumnChunk::lookup(offset_t offsetInChunk, ValueVector& output,
 }
 
 void ColumnChunk::scan(ValueVector& output, offset_t offset, length_t length) const {
-    KU_ASSERT(offset + length < numValues);
+    KU_ASSERT(offset + length <= numValues);
     // TODO(Guodong): Rework properly as scan.
     for (auto i = 0u; i < length; i++) {
         lookup(offset + i, output, i);
