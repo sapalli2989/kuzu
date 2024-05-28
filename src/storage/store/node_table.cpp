@@ -49,7 +49,7 @@ void NodeTable::initializeScanState(Transaction* transaction, TableScanState& sc
     } break;
     case TableScanSource::UNCOMMITTED: {
         ku_dynamic_cast<TableScanState&, NodeTableScanState&>(scanState)
-            .localNodeGroup->initializeScanState(scanState);
+            .localNodeTable->initializeScanState(scanState);
     } break;
     default: {
         // DO NOTHING.
@@ -84,7 +84,7 @@ bool NodeTable::scanInternal(Transaction* transaction, TableScanState& scanState
 }
 
 bool NodeTable::scanUnCommitted(NodeTableScanState& scanState) {
-    scanState.localNodeGroup->scan(scanState);
+    scanState.localNodeTable->scan(scanState);
     return true;
 }
 
@@ -109,12 +109,13 @@ bool NodeTable::scanCommitted(Transaction* transaction, NodeTableScanState& scan
     tableData->scan(transaction, *scanState.dataScanState, *scanState.nodeIDVector,
         scanState.outputVectors);
 
+    // TODO(Guodong): This should be reworked to scan updates from committed node groups.
     // Scan updates from local storage.
-    if (scanState.localNodeGroup) {
-        KU_ASSERT(transaction->isWriteTransaction());
-        scanState.localNodeGroup->lookup(*scanState.nodeIDVector, scanState.columnIDs,
-            scanState.outputVectors);
-    }
+    // if (scanState.localNodeTable) {
+    // KU_ASSERT(transaction->isWriteTransaction());
+    // scanState.localNodeTable->lookup(*scanState.nodeIDVector, scanState.columnIDs,
+    // scanState.outputVectors);
+    // }
     return true;
 }
 
@@ -134,29 +135,35 @@ offset_t NodeTable::validateUniquenessConstraint(Transaction* transaction,
 }
 
 void NodeTable::insert(Transaction* transaction, TableInsertState& insertState) {
-    const auto nodesStats =
-        ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(tablesStatistics);
+    // TODO: Eventually the logic should be like this:
+    //       - Check node groups had been cheeckpointed first to find deleted offsets.
+    //       - If there is no deleted offset, then insert the node.
+    //       - If there is a deleted offset, then reuse the offset, and turn this into an update.
+    //       Turned off the reusing of deleted offsets for now.
+
+    // const auto nodesStats =
+    // ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(tablesStatistics);
     const auto& nodeInsertState =
         ku_dynamic_cast<TableInsertState&, NodeTableInsertState&>(insertState);
-    KU_ASSERT(nodeInsertState.nodeIDVector.state->getSelVector().getSelSize() == 1);
-    const auto pos = nodeInsertState.nodeIDVector.state->getSelVector()[0];
-    const auto [offset, isNewNode] = nodesStats->addNode(tableID);
-    nodeInsertState.nodeIDVector.setValue(pos, nodeID_t{offset, tableID});
-    nodeInsertState.nodeIDVector.setNull(pos, false);
+    KU_ASSERT(nodeInsertState.propertyVectors[0]->state->getSelVector().getSelSize() == 1);
+    // const auto pos = nodeInsertState.nodeIDVector.state->getSelVector()[0];
+    // const auto [offset, isNewNode] = nodesStats->addNode(tableID);
+    // nodeInsertState.nodeIDVector.setValue(pos, nodeID_t{offset, tableID});
+    // nodeInsertState.nodeIDVector.setNull(pos, false);
     const auto localTable = transaction->getLocalStorage()->getLocalTable(tableID,
         LocalStorage::NotExistAction::CREATE);
-    if (isNewNode) {
-        if (pkIndex) {
-            insertPK(nodeInsertState.nodeIDVector, nodeInsertState.pkVector);
-        }
-        localTable->insert(insertState);
-    } else {
-        for (auto columnID = 0u; columnID < getNumColumns(); columnID++) {
-            NodeTableUpdateState updateState{columnID, nodeInsertState.nodeIDVector,
-                *nodeInsertState.propertyVectors[columnID]};
-            localTable->update(updateState);
-        }
-    }
+    // if (isNewNode) {
+    // if (pkIndex) {
+    // insertPK(nodeInsertState.nodeIDVector, nodeInsertState.pkVector);
+    // }
+    localTable->insert(insertState);
+    // } else {
+    // for (auto columnID = 0u; columnID < getNumColumns(); columnID++) {
+    // NodeTableUpdateState updateState{columnID, nodeInsertState.nodeIDVector,
+    // *nodeInsertState.propertyVectors[columnID]};
+    // localTable->update(updateState);
+    // }
+    // }
 }
 
 void NodeTable::update(Transaction* transaction, TableUpdateState& updateState) {
@@ -209,15 +216,25 @@ void NodeTable::addColumn(Transaction* transaction, const Property& property,
 
 void NodeTable::prepareCommitNodeGroup(node_group_idx_t nodeGroupIdx, Transaction* transaction,
     LocalNodeNG* localNodeGroup) const {
-    tableData->prepareLocalNodeGroupToCommit(nodeGroupIdx, transaction, localNodeGroup);
+    // tableData->prepareLocalNodeGroupToCommit(nodeGroupIdx, transaction, localNodeGroup);
 }
 
 void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) {
+    const auto localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
+    const auto numRowsToCommit = localNodeTable->getNumRows();
+    // TODO: This should be reworked to commit insertions from local table.
+    // 1. Grab a set of node offsets from table statistics for local insertions.
+    // 2. Populate hash index.
+    // 3. Divide the node offsets into node groups.
+    // 4. Append the node groups to the table data.
+    const auto nodesStats =
+        ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(tablesStatistics);
+    auto startNodeOffset = nodesStats->addNodes(tableID, numRowsToCommit);
+    offset_t numRowsCommitted = 0u;
+    while (numRowsCommitted < numRowsToCommit) {}
     if (pkIndex) {
         pkIndex->prepareCommit();
     }
-    const auto localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
-    tableData->prepareLocalTableToCommit(transaction, localNodeTable->getTableData());
     tableData->prepareCommit();
     wal->addToUpdatedTables(tableID);
 }

@@ -11,13 +11,13 @@ void ChunkedNodeGroupCollection::append(const std::vector<ValueVector*>& vectors
         chunkedGroups.push_back(
             std::make_unique<ChunkedNodeGroup>(types, false /*enableCompression*/, CHUNK_CAPACITY));
     }
-    auto numRowsToAppend = selVector.getSelSize();
+    const auto numRowsToAppend = selVector.getSelSize();
     row_idx_t numRowsAppended = 0;
     SelectionVector tmpSelVector(numRowsToAppend);
     while (numRowsAppended < numRowsToAppend) {
-        auto& lastChunkedGroup = chunkedGroups.back();
-        auto numRowsToAppendInGroup = std::min(numRowsToAppend - numRowsAppended,
-            static_cast<row_idx_t>(CHUNK_CAPACITY - lastChunkedGroup->getNumRows()));
+        const auto& lastChunkedGroup = chunkedGroups.back();
+        const auto numRowsToAppendInGroup = std::min(numRowsToAppend - numRowsAppended,
+            CHUNK_CAPACITY - lastChunkedGroup->getNumRows());
         auto tmpSelVectorBuffer = tmpSelVector.getMultableBuffer();
         for (auto i = 0u; i < numRowsToAppendInGroup; i++) {
             tmpSelVectorBuffer[i] = selVector[numRowsAppended + i];

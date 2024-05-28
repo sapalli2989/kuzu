@@ -1,6 +1,7 @@
 #include "storage/store/string_column_chunk.h"
 
 #include "common/data_chunk/sel_vector.h"
+#include "common/vector/value_vector.h"
 #include "storage/store/column_chunk.h"
 #include "storage/store/dictionary_chunk.h"
 

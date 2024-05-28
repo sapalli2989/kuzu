@@ -54,8 +54,7 @@ void NodeInsertExecutor::insert(Transaction* tx, ExecutionContext* context) {
         return;
     }
     // TODO: Move pkVector pos to info.
-    auto nodeInsertState = std::make_unique<storage::NodeTableInsertState>(*nodeIDVector,
-        *columnDataVectors[table->getPKColumnID()], columnDataVectors);
+    auto nodeInsertState = std::make_unique<storage::NodeTableInsertState>(columnDataVectors);
     table->insert(tx, *nodeInsertState);
     writeResult();
 }

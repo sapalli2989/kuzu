@@ -7,8 +7,6 @@
 #include "common/enums/rel_multiplicity.h"
 #include "common/null_mask.h"
 #include "common/types/types.h"
-#include "common/vector/value_vector.h"
-#include "storage/buffer_manager/bm_file_handle.h"
 #include "storage/compression/compression.h"
 
 namespace kuzu {
@@ -30,6 +28,7 @@ struct ColumnChunkMetadata {
         : pageIdx(pageIdx), numPages(numPages), numValues(numNodesInChunk), compMeta(compMeta) {}
 };
 
+class BMFileHandle;
 // Base data segment covers all fixed-sized data types.
 class ColumnChunk {
 public:
@@ -44,15 +43,24 @@ public:
     virtual ~ColumnChunk() = default;
 
     template<typename T>
-    inline T getValue(common::offset_t pos) const {
+    void setValue(T val, common::offset_t pos) {
+        KU_ASSERT(pos < capacity);
+        ((T*)buffer.get())[pos] = val;
+        if (pos >= numValues) {
+            numValues = pos + 1;
+        }
+    }
+
+    template<typename T>
+    T getValue(common::offset_t pos) const {
         KU_ASSERT(pos < numValues);
         return ((T*)buffer.get())[pos];
     }
 
-    inline NullColumnChunk* getNullChunk() { return nullChunk.get(); }
-    inline const NullColumnChunk& getNullChunk() const { return *nullChunk; }
-    inline common::LogicalType& getDataType() { return dataType; }
-    inline const common::LogicalType& getDataType() const { return dataType; }
+    NullColumnChunk* getNullChunk() { return nullChunk.get(); }
+    const NullColumnChunk& getNullChunk() const { return *nullChunk; }
+    common::LogicalType& getDataType() { return dataType; }
+    const common::LogicalType& getDataType() const { return dataType; }
 
     virtual void resetToEmpty();
 
@@ -66,16 +74,17 @@ public:
     ColumnChunkMetadata flushBuffer(BMFileHandle* dataFH, common::page_idx_t startPageIdx,
         const ColumnChunkMetadata& metadata);
 
-    static inline common::page_idx_t getNumPagesForBytes(uint64_t numBytes) {
+    static common::page_idx_t getNumPagesForBytes(uint64_t numBytes) {
         return (numBytes + common::BufferPoolConstants::PAGE_4KB_SIZE - 1) /
                common::BufferPoolConstants::PAGE_4KB_SIZE;
     }
 
-    inline uint64_t getNumBytesPerValue() const { return numBytesPerValue; }
-    inline uint8_t* getData() const { return buffer.get(); }
+    uint64_t getNumBytesPerValue() const { return numBytesPerValue; }
+    uint8_t* getData() const { return buffer.get(); }
 
     virtual void lookup(common::offset_t offsetInChunk, common::ValueVector& output,
         common::sel_t posInOutputVector) const;
+    void scan(common::ValueVector& output, common::offset_t offset, common::length_t length) const;
 
     // TODO(Guodong): In general, this is not a good interface. Instead of passing in
     // `offsetInVector`, we should flatten the vector to pos at `offsetInVector`.
@@ -93,21 +102,12 @@ public:
     // with
     virtual void resize(uint64_t newCapacity);
 
-    template<typename T>
-    void setValue(T val, common::offset_t pos) {
-        KU_ASSERT(pos < capacity);
-        ((T*)buffer.get())[pos] = val;
-        if (pos >= numValues) {
-            numValues = pos + 1;
-        }
-    }
-
     void populateWithDefaultVal(common::ValueVector* defaultValueVector);
     virtual void finalize() { // DO NOTHING.
     }
 
-    inline uint64_t getCapacity() const { return capacity; }
-    inline uint64_t getNumValues() const { return numValues; }
+    uint64_t getCapacity() const { return capacity; }
+    uint64_t getNumValues() const { return numValues; }
     virtual void setNumValues(uint64_t numValues_);
     virtual bool numValuesSanityCheck() const;
     bool isCompressionEnabled() const { return enableCompression; }
@@ -142,13 +142,13 @@ protected:
 };
 
 template<>
-inline void ColumnChunk::setValue(bool val, common::offset_t pos) {
+void ColumnChunk::setValue(bool val, common::offset_t pos) {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
     common::NullMask::setNull((uint64_t*)buffer.get(), pos, val);
 }
 
 template<>
-inline bool ColumnChunk::getValue(common::offset_t pos) const {
+bool ColumnChunk::getValue(common::offset_t pos) const {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
     return common::NullMask::isNull((uint64_t*)buffer.get(), pos);
 }
@@ -182,25 +182,25 @@ public:
         : BoolColumnChunk(capacity, enableCompression, false /*hasNullChunk*/),
           mayHaveNullValue{false} {}
     // Maybe this should be combined with BoolColumnChunk if the only difference is these functions?
-    inline bool isNull(common::offset_t pos) const { return getValue<bool>(pos); }
+    bool isNull(common::offset_t pos) const { return getValue<bool>(pos); }
     void setNull(common::offset_t pos, bool isNull);
 
-    inline bool mayHaveNull() const { return mayHaveNullValue; }
+    bool mayHaveNull() const { return mayHaveNullValue; }
 
-    inline void resetToEmpty() override {
+    void resetToEmpty() override {
         resetToNoNull();
         numValues = 0;
     }
-    inline void resetToNoNull() {
+    void resetToNoNull() {
         memset(buffer.get(), 0 /* non null */, bufferSize);
         mayHaveNullValue = false;
     }
-    inline void resetToAllNull() {
+    void resetToAllNull() {
         memset(buffer.get(), 0xFF /* null */, bufferSize);
         mayHaveNullValue = true;
     }
 
-    inline void copyFromBuffer(uint64_t* srcBuffer, uint64_t srcOffset, uint64_t dstOffset,
+    void copyFromBuffer(uint64_t* srcBuffer, uint64_t srcOffset, uint64_t dstOffset,
         uint64_t numBits, bool invert = false) {
         if (common::NullMask::copyNullMask(srcBuffer, srcOffset, (uint64_t*)buffer.get(), dstOffset,
                 numBits, invert)) {

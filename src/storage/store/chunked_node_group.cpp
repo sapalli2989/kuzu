@@ -47,7 +47,7 @@ void ChunkedCSRHeader::fillDefaultValues(offset_t newNumValues) const {
         offset->getNumValues() >= newNumValues && length->getNumValues() == offset->getNumValues());
 }
 
-ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<common::LogicalType>& columnTypes,
+ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<LogicalType>& columnTypes,
     bool enableCompression, uint64_t capacity)
     : nodeGroupIdx{UINT64_MAX}, numRows{0} {
     chunks.reserve(columnTypes.size());
@@ -81,7 +81,7 @@ void ChunkedNodeGroup::setAllNull() {
     }
 }
 
-void ChunkedNodeGroup::setNumRows(common::offset_t numRows_) {
+void ChunkedNodeGroup::setNumRows(offset_t numRows_) {
     for (auto& chunk : chunks) {
         chunk->setNumValues(numRows_);
     }
@@ -99,12 +99,11 @@ uint64_t ChunkedNodeGroup::append(const std::vector<ValueVector*>& columnVectors
     auto numValuesToAppendInChunk =
         std::min(numValuesToAppend, StorageConstants::NODE_GROUP_SIZE - numRows);
     auto serialSkip = 0u;
-    //    auto slicedSelVector = selVector.slice(numValuesToAppendInChunk);
     auto originalSize = selVector.getSelSize();
     selVector.setSelSize(numValuesToAppendInChunk);
     for (auto i = 0u; i < chunks.size(); i++) {
         auto chunk = chunks[i].get();
-        if (chunk->getDataType().getLogicalTypeID() == common::LogicalTypeID::SERIAL) {
+        if (chunk->getDataType().getLogicalTypeID() == LogicalTypeID::SERIAL) {
             chunk->setNumValues(chunk->getNumValues() + numValuesToAppendInChunk);
             serialSkip++;
             continue;
@@ -114,7 +113,6 @@ uint64_t ChunkedNodeGroup::append(const std::vector<ValueVector*>& columnVectors
         chunk->append(columnVector, selVector);
     }
     selVector.setSelSize(originalSize);
-    //    selVector.selectedSize = originalSize;
     numRows += numValuesToAppendInChunk;
     return numValuesToAppendInChunk;
 }
@@ -151,6 +149,17 @@ void ChunkedNodeGroup::write(const std::vector<std::unique_ptr<ColumnChunk>>& da
 
 void ChunkedNodeGroup::write(const ChunkedNodeGroup& data, column_id_t offsetColumnID) {
     write(data.chunks, offsetColumnID);
+}
+
+void ChunkedNodeGroup::scan(const std::vector<column_id_t>& columnIDs,
+    const std::vector<ValueVector*>& outputVectors, offset_t offset, length_t length) const {
+    KU_ASSERT(columnIDs.size() == outputVectors.size());
+    KU_ASSERT(offset + length <= numRows);
+    for (auto i = 0u; i < columnIDs.size(); i++) {
+        auto columnID = columnIDs[i];
+        KU_ASSERT(columnID < chunks.size());
+        chunks[columnID]->scan(*outputVectors[i], offset, length);
+    }
 }
 
 void ChunkedNodeGroup::finalize(uint64_t nodeGroupIdx_) {

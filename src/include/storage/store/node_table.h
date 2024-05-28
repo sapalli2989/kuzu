@@ -18,7 +18,7 @@ class LocalNodeTable;
 
 struct NodeTableScanState final : TableScanState {
     // Local storage node group.
-    LocalNodeNG* localNodeGroup = nullptr;
+    LocalNodeTable* localNodeTable = nullptr;
 
     explicit NodeTableScanState(std::vector<common::column_id_t> columnIDs)
         : TableScanState{std::move(columnIDs)} {
@@ -32,13 +32,11 @@ struct NodeTableScanState final : TableScanState {
 };
 
 struct NodeTableInsertState final : TableInsertState {
-    common::ValueVector& nodeIDVector;
-    const common::ValueVector& pkVector;
+    // common::ValueVector& nodeIDVector;
+    // const common::ValueVector& pkVector;
 
-    NodeTableInsertState(common::ValueVector& nodeIDVector, const common::ValueVector& pkVector,
-        const std::vector<common::ValueVector*>& propertyVectors)
-        : TableInsertState{std::move(propertyVectors)}, nodeIDVector{nodeIDVector},
-          pkVector{pkVector} {}
+    NodeTableInsertState(const std::vector<common::ValueVector*>& propertyVectors)
+        : TableInsertState{std::move(propertyVectors)} {}
 };
 
 struct NodeTableUpdateState final : TableUpdateState {
@@ -48,7 +46,8 @@ struct NodeTableUpdateState final : TableUpdateState {
 
     NodeTableUpdateState(common::column_id_t columnID, common::ValueVector& nodeIDVector,
         const common::ValueVector& propertyVector)
-        : TableUpdateState{columnID, propertyVector}, nodeIDVector{nodeIDVector} {}
+        : TableUpdateState{columnID, propertyVector}, nodeIDVector{nodeIDVector},
+          pkVector{nullptr} {}
 };
 
 struct NodeTableDeleteState final : TableDeleteState {

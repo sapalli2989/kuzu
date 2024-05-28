@@ -4,7 +4,6 @@
 
 #include "common/types/internal_id_t.h"
 #include "common/vector/value_vector.h"
-#include "storage/store/chunked_node_group.h"
 #include "storage/store/chunked_node_group_collection.h"
 
 namespace kuzu {

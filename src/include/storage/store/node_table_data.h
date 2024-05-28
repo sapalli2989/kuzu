@@ -21,7 +21,7 @@ struct NodeDataScanState final : TableDataScanState {
     bool nextVector();
 };
 
-class LocalTableData;
+class LocalNodeTable;
 class NodeTableData final : public TableData {
 public:
     NodeTableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
@@ -39,10 +39,10 @@ public:
     // Flush the nodeGroup to disk and update metadataDAs.
     void append(transaction::Transaction* transaction, ChunkedNodeGroup* nodeGroup) override;
 
-    void prepareLocalNodeGroupToCommit(common::node_group_idx_t nodeGroupIdx,
-        transaction::Transaction* transaction, LocalNodeNG* localNodeGroup) const;
-    void prepareLocalTableToCommit(transaction::Transaction* transaction,
-        LocalTableData* localTable) override;
+    // void prepareLocalNodeGroupToCommit(common::node_group_idx_t nodeGroupIdx,
+        // transaction::Transaction* transaction, LocalNodeNG* localNodeGroup) const;
+    // void prepareLocalTableToCommit(transaction::Transaction* transaction,
+        // LocalNodeTable* localTable);
 
     common::node_group_idx_t getNumCommittedNodeGroups() const override {
         return columns[0]->getNumCommittedNodeGroups();
@@ -61,7 +61,7 @@ private:
     void initializeColumnScanStates(transaction::Transaction* transaction,
         NodeDataScanState& scanState, common::node_group_idx_t nodeGroupIdx) const;
     void initializeLocalNodeReadState(transaction::Transaction* transaction,
-        TableScanState& scanState, common::node_group_idx_t nodeGroupIdx) const;
+        TableScanState& scanState) const;
 
     void lookup(transaction::Transaction* transaction, TableDataScanState& state,
         const common::ValueVector& nodeIDVector,

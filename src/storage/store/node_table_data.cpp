@@ -56,9 +56,9 @@ void NodeTableData::initializeScanState(Transaction* transaction, TableScanState
     if (scanState.dataScanState) {
         initializeColumnScanStates(transaction, dataScanState, scanState.nodeGroupIdx);
     }
-    if (transaction->isWriteTransaction()) {
-        initializeLocalNodeReadState(transaction, scanState, scanState.nodeGroupIdx);
-    }
+    // if (transaction->isWriteTransaction()) {
+    // initializeLocalNodeReadState(transaction, scanState);
+    // }
     dataScanState.vectorIdx = INVALID_VECTOR_IDX;
     dataScanState.numRowsInNodeGroup =
         columns[0]->getMetadata(scanState.nodeGroupIdx, TransactionType::READ_ONLY).numValues;
@@ -97,17 +97,13 @@ bool NodeTableData::sanityCheckOnColumnNumValues(const NodeDataScanState& scanSt
 }
 
 void NodeTableData::initializeLocalNodeReadState(Transaction* transaction,
-    TableScanState& scanState, node_group_idx_t nodeGroupIdx) const {
+    TableScanState& scanState) const {
     const auto localTable = transaction->getLocalStorage()->getLocalTable(tableID,
         LocalStorage::NotExistAction::RETURN_NULL);
     auto& nodeScanState = ku_dynamic_cast<TableScanState&, NodeTableScanState&>(scanState);
-    nodeScanState.localNodeGroup = nullptr;
+    nodeScanState.localNodeTable = nullptr;
     if (localTable) {
-        const auto localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
-        if (localNodeTable->getTableData()->nodeGroups.contains(nodeGroupIdx)) {
-            nodeScanState.localNodeGroup = ku_dynamic_cast<LocalNodeGroup*, LocalNodeNG*>(
-                localNodeTable->getTableData()->nodeGroups.at(nodeGroupIdx).get());
-        }
+        nodeScanState.localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
     }
 }
 
@@ -161,33 +157,29 @@ void NodeTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup
     }
 }
 
-void NodeTableData::prepareLocalNodeGroupToCommit(node_group_idx_t nodeGroupIdx,
-    Transaction* transaction, LocalNodeNG* localNodeGroup) const {
-    auto numNodeGroups = getNumCommittedNodeGroups();
-    const auto isNewNodeGroup = nodeGroupIdx >= numNodeGroups;
-    KU_ASSERT(std::find_if(columns.begin(), columns.end(), [&](const auto& column) {
-        return column->getNumCommittedNodeGroups() != numNodeGroups;
-    }) == columns.end());
-    for (auto columnID = 0u; columnID < columns.size(); columnID++) {
-        const auto column = columns[columnID].get();
-        auto localInsertChunk = localNodeGroup->getInsertChunks().getLocalChunk(columnID);
-        auto localUpdateChunk = localNodeGroup->getUpdateChunks(columnID).getLocalChunk(0);
-        if (localInsertChunk.empty() && localUpdateChunk.empty()) {
-            continue;
-        }
-        column->prepareCommitForChunk(transaction, nodeGroupIdx, isNewNodeGroup, localInsertChunk,
-            localNodeGroup->getInsertInfoRef(), localUpdateChunk,
-            localNodeGroup->getUpdateInfoRef(columnID), {} /* deleteInfo */);
-    }
-}
+// void NodeTableData::prepareLocalNodeGroupToCommit(node_group_idx_t nodeGroupIdx,
+    // Transaction* transaction, LocalNodeNG* localNodeGroup) const {
+    // auto numNodeGroups = getNumCommittedNodeGroups();
+    // const auto isNewNodeGroup = nodeGroupIdx >= numNodeGroups;
+    // KU_ASSERT(std::find_if(columns.begin(), columns.end(), [&](const auto& column) {
+    //     return column->getNumCommittedNodeGroups() != numNodeGroups;
+    // }) == columns.end());
+    // for (auto columnID = 0u; columnID < columns.size(); columnID++) {
+    //     const auto column = columns[columnID].get();
+    //     auto localInsertChunk = localNodeGroup->getInsertChunks().getLocalChunk(columnID);
+    //     auto localUpdateChunk = localNodeGroup->getUpdateChunks(columnID).getLocalChunk(0);
+    //     if (localInsertChunk.empty() && localUpdateChunk.empty()) {
+    //         continue;
+    //     }
+    //     column->prepareCommitForChunk(transaction, nodeGroupIdx, isNewNodeGroup,
+    //     localInsertChunk,
+    //         localNodeGroup->getInsertInfoRef(), localUpdateChunk,
+    //         localNodeGroup->getUpdateInfoRef(columnID), {} /* deleteInfo */);
+    // }
+// }
 
-void NodeTableData::prepareLocalTableToCommit(Transaction* transaction,
-    LocalTableData* localTable) {
-    for (auto& [nodeGroupIdx, localNodeGroup] : localTable->nodeGroups) {
-        prepareLocalNodeGroupToCommit(nodeGroupIdx, transaction,
-            ku_dynamic_cast<LocalNodeGroup*, LocalNodeNG*>(localNodeGroup.get()));
-    }
-}
+// void NodeTableData::prepareLocalTableToCommit(Transaction* transaction,
+    // LocalNodeTable* localTable) {}
 
 } // namespace storage
 } // namespace kuzu

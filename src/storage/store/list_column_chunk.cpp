@@ -3,6 +3,7 @@
 #include "common/cast.h"
 #include "common/data_chunk/sel_vector.h"
 #include "common/types/value/value.h"
+#include "common/vector/value_vector.h"
 #include "storage/store/column_chunk.h"
 
 using namespace kuzu::common;

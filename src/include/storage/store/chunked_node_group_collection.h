@@ -18,14 +18,14 @@ public:
         return std::make_pair(rowIdx / CHUNK_CAPACITY, rowIdx % CHUNK_CAPACITY);
     }
 
-    inline const std::vector<std::unique_ptr<ChunkedNodeGroup>>& getChunkedGroups() const {
+    const std::vector<std::unique_ptr<ChunkedNodeGroup>>& getChunkedGroups() const {
         return chunkedGroups;
     }
-    inline const ChunkedNodeGroup* getChunkedGroup(common::node_group_idx_t groupIdx) const {
+    const ChunkedNodeGroup& getChunkedGroup(common::node_group_idx_t groupIdx) const {
         KU_ASSERT(groupIdx < chunkedGroups.size());
-        return chunkedGroups[groupIdx].get();
+        return *chunkedGroups[groupIdx].get();
     }
-    inline ChunkedNodeGroup* getChunkedGroupUnsafe(common::node_group_idx_t groupIdx) {
+    ChunkedNodeGroup* getChunkedGroupUnsafe(common::node_group_idx_t groupIdx) {
         KU_ASSERT(groupIdx < chunkedGroups.size());
         return chunkedGroups[groupIdx].get();
     }
@@ -36,8 +36,8 @@ public:
     void merge(std::unique_ptr<ChunkedNodeGroup> chunkedGroup);
     void merge(ChunkedNodeGroupCollection& other);
 
-    inline uint64_t getNumChunkedGroups() const { return chunkedGroups.size(); }
-    inline void clear() { chunkedGroups.clear(); }
+    uint64_t getNumChunkedGroups() const { return chunkedGroups.size(); }
+    void clear() { chunkedGroups.clear(); }
 
 private:
     std::vector<common::LogicalType> types;

@@ -53,7 +53,7 @@ void LocalChunkedGroupCollection::appendChunkedGroup(ColumnChunk* srcOffsetChunk
 void LocalChunkedGroupCollection::readValueAtRowIdx(row_idx_t rowIdx, column_id_t columnID,
     ValueVector* outputVector, sel_t posInOutputVector) const {
     auto [chunkIdx, offsetInChunk] = getChunkIdxAndOffsetInChunk(rowIdx);
-    auto& chunk = chunkedGroups.getChunkedGroup(chunkIdx)->getColumnChunk(columnID);
+    auto& chunk = chunkedGroups.getChunkedGroup(chunkIdx).getColumnChunk(columnID);
     chunk.lookup(offsetInChunk, *outputVector, posInOutputVector);
 }
 
@@ -108,7 +108,7 @@ void LocalChunkedGroupCollection::remove(offset_t srcNodeOffset, offset_t relOff
 
 ChunkedNodeGroup* LocalChunkedGroupCollection::getLastChunkedGroupAndAddNewGroupIfNecessary() {
     if (chunkedGroups.getNumChunkedGroups() == 0 ||
-        chunkedGroups.getChunkedGroup(chunkedGroups.getNumChunkedGroups() - 1)->getNumRows() ==
+        chunkedGroups.getChunkedGroup(chunkedGroups.getNumChunkedGroups() - 1).getNumRows() ==
             ChunkedNodeGroupCollection::CHUNK_CAPACITY) {
         chunkedGroups.merge(std::make_unique<ChunkedNodeGroup>(dataTypes,
             false /*enableCompression*/, ChunkedNodeGroupCollection::CHUNK_CAPACITY));

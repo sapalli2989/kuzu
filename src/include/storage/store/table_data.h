@@ -53,7 +53,9 @@ public:
     const std::vector<std::unique_ptr<Column>>& getColumns() const { return columns; }
 
     virtual void prepareLocalTableToCommit(transaction::Transaction* transaction,
-        LocalTableData* localTable) = 0;
+        LocalTableData* localTable) {
+        // TODO(Guodong): Remove this.
+    }
     virtual void checkpointInMemory();
     virtual void rollbackInMemory();
     virtual void prepareCommit();

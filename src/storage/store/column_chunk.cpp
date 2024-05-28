@@ -4,6 +4,8 @@
 #include "common/exception/copy.h"
 #include "common/types/internal_id_t.h"
 #include "common/types/types.h"
+#include "common/vector/value_vector.h"
+#include "storage/buffer_manager/bm_file_handle.h"
 #include "storage/compression/compression.h"
 #include "storage/store/list_column_chunk.h"
 #include "storage/store/string_column_chunk.h"
@@ -240,6 +242,14 @@ void ColumnChunk::lookup(offset_t offsetInChunk, ValueVector& output,
     }
 }
 
+void ColumnChunk::scan(ValueVector& output, offset_t offset, length_t length) const {
+    KU_ASSERT(offset + length < numValues);
+    // TODO(Guodong): Rework properly as scan.
+    for (auto i = 0u; i < length; i++) {
+        lookup(offset + i, output, i);
+    }
+}
+
 void ColumnChunk::write(ColumnChunk* chunk, ColumnChunk* dstOffsets, RelMultiplicity multiplicity) {
     KU_ASSERT(chunk->dataType.getPhysicalType() == dataType.getPhysicalType() &&
               dstOffsets->getDataType().getPhysicalType() == PhysicalTypeID::INTERNAL_ID &&
@@ -430,8 +440,8 @@ void BoolColumnChunk::append(ValueVector* vector, const SelectionVector& selVect
 
 void BoolColumnChunk::append(ColumnChunk* other, offset_t startPosInOtherChunk,
     uint32_t numValuesToAppend) {
-    NullMask::copyNullMask((uint64_t*)static_cast<BoolColumnChunk*>(other)->buffer.get(),
-        startPosInOtherChunk, (uint64_t*)buffer.get(), numValues, numValuesToAppend);
+    NullMask::copyNullMask((uint64_t*)other->getData(), startPosInOtherChunk,
+        (uint64_t*)buffer.get(), numValues, numValuesToAppend);
     if (nullChunk) {
         nullChunk->append(other->getNullChunk(), startPosInOtherChunk, numValuesToAppend);
     }
@@ -483,8 +493,8 @@ void BoolColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
         numValues = dstOffsetInChunk + numValuesToCopy;
     }
-    NullMask::copyNullMask((uint64_t*)static_cast<BoolColumnChunk*>(srcChunk)->buffer.get(),
-        srcOffsetInChunk, (uint64_t*)buffer.get(), dstOffsetInChunk, numValuesToCopy);
+    NullMask::copyNullMask((uint64_t*)srcChunk->getData(), srcOffsetInChunk,
+        (uint64_t*)buffer.get(), dstOffsetInChunk, numValuesToCopy);
 }
 
 void NullColumnChunk::setNull(offset_t pos, bool isNull) {
@@ -509,14 +519,14 @@ void NullColumnChunk::write(ColumnChunk* srcChunk, offset_t srcOffsetInChunk,
     if ((dstOffsetInChunk + numValuesToCopy) >= numValues) {
         numValues = dstOffsetInChunk + numValuesToCopy;
     }
-    copyFromBuffer((uint64_t*)static_cast<NullColumnChunk*>(srcChunk)->buffer.get(),
-        srcOffsetInChunk, dstOffsetInChunk, numValuesToCopy);
+    copyFromBuffer((uint64_t*)srcChunk->getData(), srcOffsetInChunk, dstOffsetInChunk,
+        numValuesToCopy);
 }
 
 void NullColumnChunk::append(ColumnChunk* other, offset_t startOffsetInOtherChunk,
     uint32_t numValuesToAppend) {
-    copyFromBuffer((uint64_t*)static_cast<NullColumnChunk*>(other)->buffer.get(),
-        startOffsetInOtherChunk, numValues, numValuesToAppend);
+    copyFromBuffer((uint64_t*)other->getData(), startOffsetInOtherChunk, numValues,
+        numValuesToAppend);
     numValues += numValuesToAppend;
 }
 
@@ -527,7 +537,7 @@ public:
         : ColumnChunk(*LogicalType::INTERNAL_ID(), capacity, enableCompression),
           commonTableID{INVALID_TABLE_ID} {}
 
-    void append(ValueVector* vector, const common::SelectionVector& selVector) override {
+    void append(ValueVector* vector, const SelectionVector& selVector) override {
         switch (vector->dataType.getPhysicalType()) {
         case PhysicalTypeID::INTERNAL_ID: {
             copyVectorToBuffer(vector, numValues, selVector);
@@ -543,7 +553,7 @@ public:
     }
 
     void copyVectorToBuffer(ValueVector* vector, offset_t startPosInChunk,
-        const common::SelectionVector& selVector) override {
+        const SelectionVector& selVector) override {
         KU_ASSERT(vector->dataType.getPhysicalType() == PhysicalTypeID::INTERNAL_ID);
         auto relIDsInVector = (internalID_t*)vector->getData();
         if (commonTableID == INVALID_TABLE_ID) {
@@ -559,7 +569,7 @@ public:
     }
 
     void copyInt64VectorToBuffer(ValueVector* vector, offset_t startPosInChunk,
-        const common::SelectionVector& selVector) {
+        const SelectionVector& selVector) {
         KU_ASSERT(vector->dataType.getPhysicalType() == PhysicalTypeID::INT64);
         for (auto i = 0u; i < selVector.getSelSize(); i++) {
             auto pos = selVector[i];
@@ -600,7 +610,7 @@ public:
     }
 
 private:
-    common::table_id_t commonTableID;
+    table_id_t commonTableID;
 };
 
 std::unique_ptr<ColumnChunk> ColumnChunkFactory::createColumnChunk(LogicalType dataType,
