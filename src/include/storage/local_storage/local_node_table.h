@@ -64,6 +64,8 @@ public:
 
     common::row_idx_t getNumRows() const;
 
+    const ChunkedNodeGroupCollection& getChunkedGroups() const { return chunkedGroups; }
+
 private:
     ChunkedNodeGroupCollection chunkedGroups;
     // TODO: 1. Maintain a chunked group collection here for all inserted tuples. Each chunked group

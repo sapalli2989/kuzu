@@ -5,6 +5,7 @@
 #include "storage/index/hash_index.h"
 #include "storage/stats/nodes_store_statistics.h"
 #include "storage/store/chunked_node_group.h"
+#include "storage/store/node_group_collection.h"
 #include "storage/store/node_table_data.h"
 #include "storage/store/table.h"
 
@@ -131,7 +132,9 @@ private:
     bool scanUnCommitted(NodeTableScanState& scanState);
 
 private:
+    std::mutex mtx;
     std::unique_ptr<NodeTableData> tableData;
+    NodeGroupCollection deltaNodeGroups;
     common::column_id_t pkColumnID;
     std::unique_ptr<PrimaryKeyIndex> pkIndex;
 };

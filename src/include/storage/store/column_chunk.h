@@ -142,13 +142,13 @@ protected:
 };
 
 template<>
-void ColumnChunk::setValue(bool val, common::offset_t pos) {
+inline void ColumnChunk::setValue(bool val, common::offset_t pos) {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
     common::NullMask::setNull((uint64_t*)buffer.get(), pos, val);
 }
 
 template<>
-bool ColumnChunk::getValue(common::offset_t pos) const {
+inline bool ColumnChunk::getValue(common::offset_t pos) const {
     // Buffer is rounded up to the nearest 8 bytes so that this cast is safe
     return common::NullMask::isNull((uint64_t*)buffer.get(), pos);
 }
