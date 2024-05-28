@@ -34,10 +34,11 @@ struct NodeTableScanState final : TableScanState {
 
 struct NodeTableInsertState final : TableInsertState {
     // common::ValueVector& nodeIDVector;
-    // const common::ValueVector& pkVector;
+    const common::ValueVector& pkVector;
 
-    NodeTableInsertState(const std::vector<common::ValueVector*>& propertyVectors)
-        : TableInsertState{std::move(propertyVectors)} {}
+    explicit NodeTableInsertState(const common::ValueVector& pkVector,
+        const std::vector<common::ValueVector*>& propertyVectors)
+        : TableInsertState{std::move(propertyVectors)}, pkVector{pkVector} {}
 };
 
 struct NodeTableUpdateState final : TableUpdateState {

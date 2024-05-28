@@ -32,6 +32,15 @@ struct TableInsertState {
     explicit TableInsertState(const std::vector<common::ValueVector*>& propertyVectors)
         : propertyVectors{propertyVectors} {}
     virtual ~TableInsertState() = default;
+
+    template<typename T>
+    const T& constCast() {
+        return common::ku_dynamic_cast<const TableInsertState&, const T&>(*this);
+    }
+    template<typename T>
+    T& cast() {
+        return common::ku_dynamic_cast<TableInsertState&, T&>(*this);
+    }
 };
 
 struct TableUpdateState {

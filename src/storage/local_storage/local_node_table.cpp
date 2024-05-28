@@ -1,7 +1,6 @@
 #include "storage/local_storage/local_node_table.h"
 
 #include "common/cast.h"
-#include "storage/storage_utils.h"
 #include "storage/store/node_table.h"
 
 using namespace kuzu::common;
@@ -142,11 +141,26 @@ static std::vector<LogicalType> getTableColumnTypes(const NodeTable& table) {
 
 LocalNodeTable::LocalNodeTable(Table& table)
     : LocalTable{table},
-      chunkedGroups{getTableColumnTypes(ku_dynamic_cast<const Table&, const NodeTable&>(table))} {}
+      chunkedGroups{getTableColumnTypes(ku_dynamic_cast<const Table&, const NodeTable&>(table))} {
+    auto& nodeTable = ku_dynamic_cast<const Table&, const NodeTable&>(table);
+    DBFileIDAndName dbFileIDAndName{DBFileID{DBFileType::NODE_INDEX}, "in-mem-overflow"};
+    overflowFile = std::make_unique<InMemOverflowFile>(dbFileIDAndName);
+    PageCursor cursor{0, 0};
+    overflowFileHandle = std::make_unique<OverflowFileHandle>(*overflowFile, cursor);
+    hashIndex = std::make_unique<LocalHashIndex>(
+        nodeTable.getColumn(nodeTable.getPKColumnID())->getDataType().getPhysicalType(),
+        overflowFileHandle.get());
+}
 
 bool LocalNodeTable::insert(TableInsertState& insertState) {
+    auto& nodeInsertState = insertState.constCast<NodeTableInsertState>();
+    auto numRowsInLocalTable = chunkedGroups.getNumRows();
+    if (!hashIndex->insert(nodeInsertState.pkVector,
+            StorageConstants::MAX_NUM_NODES_IN_TABLE + numRowsInLocalTable)) {
+        throw RuntimeException(
+            stringFormat("Found duplicate primary key in local table {}", table.getTableID()));
+    }
     // TODO(Guodong): Assume all property vectors have the same selVector here. Should be changed.
-    // TODO(Guodong): Should check local hash index here.
     chunkedGroups.append(insertState.propertyVectors,
         insertState.propertyVectors[0]->state->getSelVector());
     return true;
@@ -168,7 +182,7 @@ void LocalNodeTable::initializeScanState(TableScanState& scanState) const {
     dataScanState.numRowsInNodeGroup = getNumRows();
 }
 
-void LocalNodeTable::scan(TableScanState& scanState) {
+void LocalNodeTable::scan(TableScanState& scanState) const {
     KU_ASSERT(scanState.source == TableScanSource::UNCOMMITTED);
     // Fill node ID vector.
     auto& scanDataState =
@@ -181,14 +195,6 @@ void LocalNodeTable::scan(TableScanState& scanState) {
     auto& chunkedGroup = chunkedGroups.getChunkedGroup(scanDataState.vectorIdx);
     chunkedGroup.scan(scanState.columnIDs, scanState.outputVectors, 0, scanDataState.numRowsToScan);
     scanState.nodeIDVector->state->getSelVectorUnsafe().setSelSize(scanDataState.numRowsToScan);
-}
-
-row_idx_t LocalNodeTable::getNumRows() const {
-    row_idx_t numRows = 0;
-    for (auto& chunkedGroup : chunkedGroups.getChunkedGroups()) {
-        numRows += chunkedGroup->getNumRows();
-    }
-    return numRows;
 }
 
 } // namespace storage

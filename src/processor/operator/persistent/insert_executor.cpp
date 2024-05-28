@@ -32,7 +32,7 @@ void NodeInsertExecutor::init(ResultSet* resultSet, ExecutionContext* context) {
     }
 }
 
-static void writeColumnVector(common::ValueVector* columnVector, common::ValueVector* dataVector) {
+static void writeColumnVector(ValueVector* columnVector, ValueVector* dataVector) {
     KU_ASSERT(columnVector->state->getSelVector().getSelSize() == 1 &&
               dataVector->state->getSelVector().getSelSize() == 1);
     auto lhsPos = columnVector->state->getSelVector()[0];
@@ -54,7 +54,8 @@ void NodeInsertExecutor::insert(Transaction* tx, ExecutionContext* context) {
         return;
     }
     // TODO: Move pkVector pos to info.
-    auto nodeInsertState = std::make_unique<storage::NodeTableInsertState>(columnDataVectors);
+    auto nodeInsertState = std::make_unique<storage::NodeTableInsertState>(
+        *columnDataVectors[table->getPKColumnID()], columnDataVectors);
     table->insert(tx, *nodeInsertState);
     writeResult();
 }

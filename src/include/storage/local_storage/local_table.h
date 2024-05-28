@@ -62,7 +62,7 @@ public:
     bool read(common::offset_t offset, common::column_id_t columnID,
         common::ValueVector* outputVector, common::sel_t posInOutputVector) const;
 
-    ChunkedNodeGroup* getLastChunkedGroupAndAddNewGroupIfNecessary();
+    ChunkedNodeGroup& getLastChunkedGroupAndAddNewGroupIfNecessary();
     void append(common::offset_t offset, const std::vector<common::ValueVector*>& vectors) {
         offsetToRowIdx[offset] = append(vectors);
     }

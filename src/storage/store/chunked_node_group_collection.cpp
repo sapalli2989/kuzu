@@ -47,5 +47,13 @@ void ChunkedNodeGroupCollection::merge(ChunkedNodeGroupCollection& other) {
     }
 }
 
+row_idx_t ChunkedNodeGroupCollection::getNumRows() const {
+    row_idx_t numRows = 0;
+    for (auto& chunkedGroup : chunkedGroups) {
+        numRows += chunkedGroup->getNumRows();
+    }
+    return numRows;
+}
+
 } // namespace storage
 } // namespace kuzu

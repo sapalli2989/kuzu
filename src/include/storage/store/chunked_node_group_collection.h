@@ -25,9 +25,9 @@ public:
         KU_ASSERT(groupIdx < chunkedGroups.size());
         return *chunkedGroups[groupIdx].get();
     }
-    ChunkedNodeGroup* getChunkedGroupUnsafe(common::node_group_idx_t groupIdx) {
+    ChunkedNodeGroup& getChunkedGroupUnsafe(common::node_group_idx_t groupIdx) const {
         KU_ASSERT(groupIdx < chunkedGroups.size());
-        return chunkedGroups[groupIdx].get();
+        return *chunkedGroups[groupIdx].get();
     }
 
     void append(const std::vector<common::ValueVector*>& vectors,
@@ -38,6 +38,7 @@ public:
 
     uint64_t getNumChunkedGroups() const { return chunkedGroups.size(); }
     void clear() { chunkedGroups.clear(); }
+    common::row_idx_t getNumRows() const;
 
 private:
     std::vector<common::LogicalType> types;

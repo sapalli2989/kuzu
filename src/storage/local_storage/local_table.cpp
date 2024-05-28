@@ -90,7 +90,7 @@ void LocalChunkedGroupCollection::update(offset_t offset, column_id_t columnID,
     KU_ASSERT(offsetToRowIdx.contains(offset));
     const auto rowIdx = offsetToRowIdx.at(offset);
     auto [chunkIdx, offsetInChunk] = getChunkIdxAndOffsetInChunk(rowIdx);
-    auto& chunk = chunkedGroups.getChunkedGroupUnsafe(chunkIdx)->getColumnChunkUnsafe(columnID);
+    auto& chunk = chunkedGroups.getChunkedGroupUnsafe(chunkIdx).getColumnChunkUnsafe(columnID);
     const auto pos = propertyVector->state->getSelVector()[0];
     chunk.write(propertyVector, pos, offsetInChunk);
 }
@@ -106,7 +106,7 @@ void LocalChunkedGroupCollection::remove(offset_t srcNodeOffset, offset_t relOff
     }
 }
 
-ChunkedNodeGroup* LocalChunkedGroupCollection::getLastChunkedGroupAndAddNewGroupIfNecessary() {
+ChunkedNodeGroup& LocalChunkedGroupCollection::getLastChunkedGroupAndAddNewGroupIfNecessary() {
     if (chunkedGroups.getNumChunkedGroups() == 0 ||
         chunkedGroups.getChunkedGroup(chunkedGroups.getNumChunkedGroups() - 1).getNumRows() ==
             ChunkedNodeGroupCollection::CHUNK_CAPACITY) {
@@ -118,13 +118,13 @@ ChunkedNodeGroup* LocalChunkedGroupCollection::getLastChunkedGroupAndAddNewGroup
 
 row_idx_t LocalChunkedGroupCollection::append(const std::vector<ValueVector*>& vectors) {
     KU_ASSERT(vectors.size() == dataTypes.size());
-    const auto lastChunkGroup = getLastChunkedGroupAndAddNewGroupIfNecessary();
+    auto& lastChunkGroup = getLastChunkedGroupAndAddNewGroupIfNecessary();
     for (auto i = 0u; i < vectors.size(); i++) {
         KU_ASSERT(vectors[i]->state->getSelVector().getSelSize() == 1);
-        lastChunkGroup->getColumnChunkUnsafe(i).append(vectors[i],
+        lastChunkGroup.getColumnChunkUnsafe(i).append(vectors[i],
             vectors[i]->state->getSelVector());
     }
-    lastChunkGroup->setNumRows(lastChunkGroup->getNumRows() + 1);
+    lastChunkGroup.setNumRows(lastChunkGroup.getNumRows() + 1);
     return numRows++;
 }
 
@@ -133,9 +133,9 @@ void LocalChunkedGroupCollection::append(offset_t offset, ChunkedNodeGroup* node
     KU_ASSERT(nodeGroup->getNumColumns() == dataTypes.size());
     offset_t appended = 0;
     do {
-        const auto lastChunkGroup = getLastChunkedGroupAndAddNewGroupIfNecessary();
+        auto& lastChunkGroup = getLastChunkedGroupAndAddNewGroupIfNecessary();
         const auto appendedInChunk =
-            lastChunkGroup->append(nodeGroup, appended, numValues - appended);
+            lastChunkGroup.append(nodeGroup, appended, numValues - appended);
         for (size_t i = 0; i < appendedInChunk; i++) {
             offsetToRowIdx[offset + appended + i] = numRows++;
         }

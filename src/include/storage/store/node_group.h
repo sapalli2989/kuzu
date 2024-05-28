@@ -11,7 +11,7 @@ public:
         const std::vector<common::LogicalType>& types)
         : nodeGroupIdx{nodeGroupIdx}, startNodeOffset{0}, chunkedGroups{types} {}
 
-    common::row_idx_t getNumRows() const;
+    common::row_idx_t getNumRows() const { return chunkedGroups.getNumRows(); }
 
 private:
     common::node_group_idx_t nodeGroupIdx;
