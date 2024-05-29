@@ -135,7 +135,7 @@ void LocalChunkedGroupCollection::append(offset_t offset, ChunkedNodeGroup* node
     do {
         auto& lastChunkGroup = getLastChunkedGroupAndAddNewGroupIfNecessary();
         const auto appendedInChunk =
-            lastChunkGroup.append(nodeGroup, appended, numValues - appended);
+            lastChunkGroup.append(*nodeGroup, appended, numValues - appended);
         for (size_t i = 0; i < appendedInChunk; i++) {
             offsetToRowIdx[offset + appended + i] = numRows++;
         }

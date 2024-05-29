@@ -9,7 +9,6 @@ using namespace kuzu::common;
 
 namespace kuzu {
 namespace storage {
-
 bool ChunkedCSRHeader::sanityCheck() const {
     if (offset->getNumValues() != length->getNumValues()) {
         return false;
@@ -49,7 +48,7 @@ void ChunkedCSRHeader::fillDefaultValues(offset_t newNumValues) const {
 
 ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<LogicalType>& columnTypes,
     bool enableCompression, uint64_t capacity)
-    : nodeGroupIdx{UINT64_MAX}, numRows{0} {
+    : nodeGroupIdx{INVALID_NODE_GROUP_IDX}, capacity{capacity}, numRows{0} {
     chunks.reserve(columnTypes.size());
     for (auto& type : columnTypes) {
         chunks.push_back(
@@ -59,7 +58,8 @@ ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<LogicalType>& columnTypes,
 
 ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& columns,
     bool enableCompression)
-    : nodeGroupIdx{UINT64_MAX}, numRows{0} {
+    : nodeGroupIdx{INVALID_NODE_GROUP_IDX}, capacity{StorageConstants::NODE_GROUP_SIZE},
+      numRows{0} {
     chunks.reserve(columns.size());
     for (auto columnID = 0u; columnID < columns.size(); columnID++) {
         chunks.push_back(ColumnChunkFactory::createColumnChunk(
@@ -117,13 +117,14 @@ uint64_t ChunkedNodeGroup::append(const std::vector<ValueVector*>& columnVectors
     return numValuesToAppendInChunk;
 }
 
-offset_t ChunkedNodeGroup::append(ChunkedNodeGroup* other, offset_t offsetInOtherNodeGroup,
+offset_t ChunkedNodeGroup::append(const ChunkedNodeGroup& other, offset_t offsetInOtherNodeGroup,
     offset_t numValues) {
-    KU_ASSERT(other->chunks.size() == chunks.size());
-    auto numNodesToAppend = std::min(std::min(numValues, other->numRows - offsetInOtherNodeGroup),
-        chunks[0]->getCapacity() - numRows);
+    KU_ASSERT(other.chunks.size() == chunks.size());
+    const auto numNodesToAppend =
+        std::min(std::min(numValues, other.numRows - offsetInOtherNodeGroup),
+            chunks[0]->getCapacity() - numRows);
     for (auto i = 0u; i < chunks.size(); i++) {
-        chunks[i]->append(other->chunks[i].get(), offsetInOtherNodeGroup, numNodesToAppend);
+        chunks[i]->append(other.chunks[i].get(), offsetInOtherNodeGroup, numNodesToAppend);
     }
     numRows += numNodesToAppend;
     return numNodesToAppend;

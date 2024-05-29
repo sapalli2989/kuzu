@@ -13,7 +13,8 @@ class Column;
 class ChunkedNodeGroup {
 public:
     explicit ChunkedNodeGroup(std::vector<std::unique_ptr<ColumnChunk>> chunks)
-        : chunks{std::move(chunks)}, nodeGroupIdx{common::INVALID_NODE_GROUP_IDX}, numRows{0} {}
+        : chunks{std::move(chunks)}, nodeGroupIdx{common::INVALID_NODE_GROUP_IDX},
+          capacity{common::StorageConstants::NODE_GROUP_SIZE}, numRows{0} {}
     ChunkedNodeGroup(const std::vector<common::LogicalType>& columnTypes, bool enableCompression,
         uint64_t capacity);
     ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& columns, bool enableCompression);
@@ -26,12 +27,12 @@ public:
         KU_ASSERT(columnID < chunks.size());
         return *chunks[columnID];
     }
-    ColumnChunk& getColumnChunkUnsafe(common::column_id_t columnID) {
+    ColumnChunk& getColumnChunkUnsafe(common::column_id_t columnID) const {
         KU_ASSERT(columnID < chunks.size());
         return *chunks[columnID];
     }
     std::vector<std::unique_ptr<ColumnChunk>>& getColumnChunksUnsafe() { return chunks; }
-    bool isFull() const { return numRows == common::StorageConstants::NODE_GROUP_SIZE; }
+    bool isFull() const { return numRows == capacity; }
 
     void resetToEmpty();
     void setAllNull();
@@ -42,8 +43,8 @@ public:
     uint64_t append(const std::vector<common::ValueVector*>& columnVectors,
         common::SelectionVector& selVector, uint64_t numValuesToAppend);
     // Appends up to numValuesToAppend from the other chunked node group, returning the actual
-    // number of values appended
-    common::offset_t append(ChunkedNodeGroup* other, common::offset_t offsetInOtherNodeGroup,
+    // number of values appended.
+    common::offset_t append(const ChunkedNodeGroup& other, common::offset_t offsetInOtherNodeGroup,
         common::offset_t numValuesToAppend = common::StorageConstants::NODE_GROUP_SIZE);
     void write(const std::vector<std::unique_ptr<ColumnChunk>>& data,
         common::column_id_t offsetColumnID);
@@ -65,6 +66,7 @@ protected:
 
 private:
     uint64_t nodeGroupIdx;
+    uint64_t capacity;
     common::row_idx_t numRows;
 };
 

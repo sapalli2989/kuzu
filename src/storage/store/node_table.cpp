@@ -26,6 +26,7 @@ NodeTable::NodeTable(StorageManager* storageManager, NodeTableCatalogEntry* node
         storageManager->getMetadataFH(), nodeTableEntry, bufferManager, wal,
         nodeTableEntry->getPropertiesRef(), storageManager->getNodesStatisticsAndDeletedIDs(),
         storageManager->compressionEnabled());
+    deltaNodeGroups = NodeGroupCollection{getTableColumnTypes(*this)};
     initializePKIndex(storageManager->getDatabasePath(), nodeTableEntry,
         storageManager->isReadOnly(), vfs, context);
 }
@@ -214,29 +215,24 @@ void NodeTable::addColumn(Transaction* transaction, const Property& property,
     wal->addToUpdatedTables(tableID);
 }
 
-void NodeTable::prepareCommitNodeGroup(node_group_idx_t nodeGroupIdx, Transaction* transaction,
-    LocalNodeNG* localNodeGroup) const {
-    // tableData->prepareLocalNodeGroupToCommit(nodeGroupIdx, transaction, localNodeGroup);
-}
-
 void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) {
     std::unique_lock xLck{mtx};
     const auto localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
     // 1. Grab a set of node offsets from table statistics for local insertions.
     const auto nodesStats =
         ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(tablesStatistics);
-    auto numNodesCheckpointed = nodesStats->getNumTuplesForTable(transaction, tableID);
+    const auto numNodesCheckpointed = nodesStats->getNumTuplesForTable(transaction, tableID);
     auto startNodeOffset = numNodesCheckpointed + deltaNodeGroups.getNumRows();
 
     // 2. Populate hash index.
     std::vector<column_id_t> columnsToScan{pkColumnID};
-    auto state = std::make_shared<DataChunkState>();
+    const auto state = std::make_shared<DataChunkState>();
     ValueVector nodeIDVector(*LogicalType::INTERNAL_ID());
     nodeIDVector.setState(state);
     ValueVector pkVector(tableData->getColumn(pkColumnID)->getDataType());
     pkVector.setState(state);
     std::vector<ValueVector*> outputVectors{&pkVector};
-    auto scanState =
+    const auto scanState =
         std::make_unique<NodeTableScanState>(&nodeIDVector, columnsToScan, outputVectors);
     scanState->source = TableScanSource::UNCOMMITTED;
     scanState->localNodeTable = localNodeTable;

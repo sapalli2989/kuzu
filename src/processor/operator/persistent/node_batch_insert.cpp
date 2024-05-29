@@ -47,14 +47,14 @@ void NodeBatchInsert::appendIncompleteNodeGroup(transaction::Transaction* transa
         return;
     }
     auto numNodesAppended =
-        nodeSharedState->sharedNodeGroup->append(localNodeGroup.get(), 0 /* offsetInNodeGroup */);
+        nodeSharedState->sharedNodeGroup->append(*localNodeGroup, 0 /* offsetInNodeGroup */);
     if (nodeSharedState->sharedNodeGroup->isFull()) {
         node_group_idx_t nodeGroupIdx = nodeSharedState->getNextNodeGroupIdxWithoutLock();
         writeAndResetNodeGroup(transaction, nodeGroupIdx, nodeSharedState->sharedNodeGroup,
             indexBuilder);
     }
     if (numNodesAppended < localNodeGroup->getNumRows()) {
-        nodeSharedState->sharedNodeGroup->append(localNodeGroup.get(), numNodesAppended);
+        nodeSharedState->sharedNodeGroup->append(*localNodeGroup, numNodesAppended);
     }
 }
 
@@ -167,7 +167,7 @@ offset_t NodeBatchInsert::writeToExistingNodeGroup(transaction::Transaction* tra
     }
     auto nodeInfo = ku_dynamic_cast<BatchInsertInfo*, NodeBatchInsertInfo*>(info.get());
     // LocalNodeNG localNodeGroup(table->getTableID(),
-        // StorageUtils::getStartOffsetOfNodeGroup(nodeGroupIdx), nodeInfo->columnTypes);
+    // StorageUtils::getStartOffsetOfNodeGroup(nodeGroupIdx), nodeInfo->columnTypes);
     // auto& insertChunks = localNodeGroup.getInsertChunks();
     // insertChunks.append(numExistingTuplesInChunk, nodeGroup, numRowsToWrite);
     // table->prepareCommitNodeGroup(nodeGroupIdx, transaction, &localNodeGroup);
@@ -184,7 +184,7 @@ void NodeBatchInsert::clearToIndex(std::unique_ptr<ChunkedNodeGroup>& nodeGroup,
     auto nodeInfo = ku_dynamic_cast<BatchInsertInfo*, NodeBatchInsertInfo*>(info.get());
     nodeGroup = NodeGroupFactory::createNodeGroup(ColumnDataFormat::REGULAR, nodeInfo->columnTypes,
         info->compressionEnabled);
-    nodeGroup->append(oldNodeGroup.get(), startIndexInGroup);
+    nodeGroup->append(*oldNodeGroup, startIndexInGroup);
 }
 
 void NodeBatchInsert::copyToNodeGroup(transaction::Transaction* transaction) {

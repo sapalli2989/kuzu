@@ -32,7 +32,10 @@ public:
 
     void append(const std::vector<common::ValueVector*>& vectors,
         const common::SelectionVector& selVector);
+    void append(const ChunkedNodeGroupCollection& other, common::offset_t offsetInOtherCollection,
+        common::offset_t numRowsToAppend);
 
+    // `merge` are directly moving the chunkedGroup to the collection.
     void merge(std::unique_ptr<ChunkedNodeGroup> chunkedGroup);
     void merge(ChunkedNodeGroupCollection& other);
 

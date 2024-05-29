@@ -33,12 +33,14 @@ struct NodeTableScanState final : TableScanState {
 };
 
 struct NodeTableInsertState final : TableInsertState {
-    // common::ValueVector& nodeIDVector;
+    common::ValueVector& nodeIDVector;
     const common::ValueVector& pkVector;
 
-    explicit NodeTableInsertState(const common::ValueVector& pkVector,
+    explicit NodeTableInsertState(common::ValueVector& nodeIDVector,
+        const common::ValueVector& pkVector,
         const std::vector<common::ValueVector*>& propertyVectors)
-        : TableInsertState{std::move(propertyVectors)}, pkVector{pkVector} {}
+        : TableInsertState{std::move(propertyVectors)}, nodeIDVector{nodeIDVector},
+          pkVector{pkVector} {}
 };
 
 struct NodeTableUpdateState final : TableUpdateState {
@@ -63,6 +65,14 @@ struct NodeTableDeleteState final : TableDeleteState {
 class StorageManager;
 class NodeTable final : public Table {
 public:
+    static std::vector<common::LogicalType> getTableColumnTypes(const NodeTable& table) {
+        std::vector<common::LogicalType> types;
+        for (auto i = 0u; i < table.getNumColumns(); i++) {
+            types.push_back(table.getColumn(i)->getDataType());
+        }
+        return types;
+    }
+
     NodeTable(StorageManager* storageManager, catalog::NodeTableCatalogEntry* nodeTableEntry,
         MemoryManager* memoryManager, common::VirtualFileSystem* vfs, main::ClientContext* context);
 
@@ -106,8 +116,6 @@ public:
         tableData->append(transaction, nodeGroup);
     }
 
-    void prepareCommitNodeGroup(common::node_group_idx_t nodeGroupIdx,
-        transaction::Transaction* transaction, LocalNodeNG* localNodeGroup) const;
     void prepareCommit(transaction::Transaction* transaction, LocalTable* localTable) override;
     void prepareCommit() override;
     void prepareRollback(LocalTable* localTable) override;

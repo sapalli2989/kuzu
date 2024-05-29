@@ -24,11 +24,36 @@ void ChunkedNodeGroupCollection::append(const std::vector<ValueVector*>& vectors
         }
         tmpSelVector.setToFiltered(numRowsToAppendInGroup);
         lastChunkedGroup->append(vectors, tmpSelVector, numRowsToAppendInGroup);
-        if (lastChunkedGroup->getNumRows() == CHUNK_CAPACITY) {
+        if (lastChunkedGroup->isFull()) {
             chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
                 false /*enableCompression*/, CHUNK_CAPACITY));
         }
         numRowsAppended += numRowsToAppendInGroup;
+    }
+}
+
+void ChunkedNodeGroupCollection::append(const ChunkedNodeGroupCollection& other, offset_t offset,
+    offset_t numRowsToAppend) {
+    row_idx_t numRowsAppended = 0u;
+    if (chunkedGroups.empty()) {
+        chunkedGroups.push_back(
+            std::make_unique<ChunkedNodeGroup>(types, false /*enableCompression*/, CHUNK_CAPACITY));
+    }
+    while (numRowsAppended < numRowsToAppend) {
+        const auto chunkIdx = offset / CHUNK_CAPACITY;
+        const auto offsetInChunk = offset % CHUNK_CAPACITY;
+        auto& chunkedGroupToCopyFrom = other.getChunkedGroup(chunkIdx);
+        auto numToCopyFromChunk = chunkedGroupToCopyFrom.getNumRows() - offsetInChunk;
+        if (chunkedGroups.back()->isFull()) {
+            chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
+                false /*enableCompression*/, CHUNK_CAPACITY));
+        }
+        const auto& chunkedGroupToCopyInto = chunkedGroups.back();
+        auto numToCopyIntoChunk = CHUNK_CAPACITY - chunkedGroupToCopyInto->getNumRows();
+        const auto numToAppendInChunk = std::min(numToCopyFromChunk, numToCopyIntoChunk);
+        chunkedGroupToCopyInto->append(chunkedGroupToCopyFrom, offsetInChunk, numToAppendInChunk);
+        numRowsAppended += numToAppendInChunk;
+        offset += numToAppendInChunk;
     }
 }
 
