@@ -111,7 +111,7 @@ ChunkedNodeGroup& LocalChunkedGroupCollection::getLastChunkedGroupAndAddNewGroup
         chunkedGroups.getChunkedGroup(chunkedGroups.getNumChunkedGroups() - 1).getNumRows() ==
             ChunkedNodeGroupCollection::CHUNK_CAPACITY) {
         chunkedGroups.merge(std::make_unique<ChunkedNodeGroup>(dataTypes,
-            false /*enableCompression*/, ChunkedNodeGroupCollection::CHUNK_CAPACITY));
+            false /*enableCompression*/, ChunkedNodeGroupCollection::CHUNK_CAPACITY, numRows));
     }
     return chunkedGroups.getChunkedGroupUnsafe(chunkedGroups.getNumChunkedGroups() - 1);
 }

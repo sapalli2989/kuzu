@@ -48,25 +48,22 @@ bool LocalNodeTable::delete_(TableDeleteState& deleteState) {
 }
 
 void LocalNodeTable::initializeScanState(TableScanState& scanState) const {
-    auto& dataScanState =
-        ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*scanState.dataScanState);
-    dataScanState.vectorIdx = INVALID_VECTOR_IDX;
-    dataScanState.numRowsInNodeGroup = getNumRows();
+    auto& nodeScanState = scanState.cast<NodeTableScanState>();
+    nodeScanState.vectorIdx = INVALID_VECTOR_IDX;
+    nodeScanState.numTotalRows = getNumRows();
 }
 
 void LocalNodeTable::scan(TableScanState& scanState) const {
     KU_ASSERT(scanState.source == TableScanSource::UNCOMMITTED);
-    // Fill node ID vector.
-    auto& scanDataState =
-        ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*scanState.dataScanState);
+    auto& nodeScanState = scanState.cast<NodeTableScanState>();
     auto startNodeOffset = StorageConstants::MAX_NUM_NODES_IN_TABLE +
-                           scanDataState.vectorIdx * DEFAULT_VECTOR_CAPACITY;
-    for (auto i = 0u; i < scanDataState.numRowsToScan; i++) {
+                           nodeScanState.vectorIdx * DEFAULT_VECTOR_CAPACITY;
+    for (auto i = 0u; i < nodeScanState.numRowsToScan; i++) {
         scanState.nodeIDVector->setValue(i, nodeID_t{startNodeOffset + i, table.getTableID()});
     }
-    auto& chunkedGroup = chunkedGroups.getChunkedGroup(scanDataState.vectorIdx);
-    chunkedGroup.scan(scanState.columnIDs, scanState.outputVectors, 0, scanDataState.numRowsToScan);
-    scanState.nodeIDVector->state->getSelVectorUnsafe().setSelSize(scanDataState.numRowsToScan);
+    auto& chunkedGroup = chunkedGroups.getChunkedGroup(nodeScanState.vectorIdx);
+    chunkedGroup.scan(scanState.columnIDs, scanState.outputVectors, 0, nodeScanState.numRowsToScan);
+    scanState.nodeIDVector->state->getSelVectorUnsafe().setSelSize(nodeScanState.numRowsToScan);
 }
 
 } // namespace storage

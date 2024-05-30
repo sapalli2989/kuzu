@@ -8,8 +8,8 @@ namespace storage {
 void ChunkedNodeGroupCollection::append(const std::vector<ValueVector*>& vectors,
     const SelectionVector& selVector) {
     if (chunkedGroups.empty()) {
-        chunkedGroups.push_back(
-            std::make_unique<ChunkedNodeGroup>(types, false /*enableCompression*/, CHUNK_CAPACITY));
+        chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
+            false /*enableCompression*/, CHUNK_CAPACITY, 0 /*startOffset*/));
     }
     const auto numRowsToAppend = selVector.getSelSize();
     row_idx_t numRowsAppended = 0;
@@ -25,8 +25,9 @@ void ChunkedNodeGroupCollection::append(const std::vector<ValueVector*>& vectors
         tmpSelVector.setToFiltered(numRowsToAppendInGroup);
         lastChunkedGroup->append(vectors, tmpSelVector, numRowsToAppendInGroup);
         if (lastChunkedGroup->isFull()) {
+            auto startOffset = getNumRows();
             chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
-                false /*enableCompression*/, CHUNK_CAPACITY));
+                false /*enableCompression*/, CHUNK_CAPACITY, startOffset));
         }
         numRowsAppended += numRowsToAppendInGroup;
     }
@@ -36,8 +37,8 @@ void ChunkedNodeGroupCollection::append(const ChunkedNodeGroupCollection& other,
     offset_t numRowsToAppend) {
     row_idx_t numRowsAppended = 0u;
     if (chunkedGroups.empty()) {
-        chunkedGroups.push_back(
-            std::make_unique<ChunkedNodeGroup>(types, false /*enableCompression*/, CHUNK_CAPACITY));
+        chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
+            false /*enableCompression*/, CHUNK_CAPACITY, 0 /*startOffset*/));
     }
     while (numRowsAppended < numRowsToAppend) {
         const auto chunkIdx = offset / CHUNK_CAPACITY;
@@ -46,7 +47,7 @@ void ChunkedNodeGroupCollection::append(const ChunkedNodeGroupCollection& other,
         auto numToCopyFromChunk = chunkedGroupToCopyFrom.getNumRows() - offsetInChunk;
         if (chunkedGroups.back()->isFull()) {
             chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
-                false /*enableCompression*/, CHUNK_CAPACITY));
+                false /*enableCompression*/, CHUNK_CAPACITY, getNumRows()));
         }
         const auto& chunkedGroupToCopyInto = chunkedGroups.back();
         auto numToCopyIntoChunk = CHUNK_CAPACITY - chunkedGroupToCopyInto->getNumRows();

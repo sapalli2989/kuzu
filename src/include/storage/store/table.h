@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage/stats/table_statistics_collection.h"
+#include "storage/store/node_group.h"
 #include "storage/store/table_data.h"
 
 namespace kuzu {
@@ -8,22 +9,33 @@ namespace storage {
 
 enum class TableScanSource : uint8_t { COMMITTED = 0, UNCOMMITTED = 1, NONE = 2 };
 struct TableScanState {
+    common::table_id_t tableID;
     common::ValueVector* nodeIDVector;
     std::vector<common::column_id_t> columnIDs;
     std::vector<common::ValueVector*> outputVectors;
 
     TableScanSource source = TableScanSource::NONE;
+    NodeGroupScanState nodeGroupScanState;
     std::unique_ptr<TableDataScanState> dataScanState;
     common::node_group_idx_t nodeGroupIdx = common::INVALID_NODE_GROUP_IDX;
 
-    explicit TableScanState(std::vector<common::column_id_t> columnIDs)
-        : nodeIDVector(nullptr), columnIDs{std::move(columnIDs)} {}
-    TableScanState(common::ValueVector* nodeIDVector, std::vector<common::column_id_t> columnIDs,
-        std::vector<common::ValueVector*> outputVectors)
-        : nodeIDVector{nodeIDVector}, columnIDs{std::move(columnIDs)},
+    explicit TableScanState(common::table_id_t tableID, std::vector<common::column_id_t> columnIDs)
+        : tableID{tableID}, nodeIDVector(nullptr), columnIDs{std::move(columnIDs)} {}
+    TableScanState(common::table_id_t tableID, common::ValueVector* nodeIDVector,
+        std::vector<common::column_id_t> columnIDs, std::vector<common::ValueVector*> outputVectors)
+        : tableID{tableID}, nodeIDVector{nodeIDVector}, columnIDs{std::move(columnIDs)},
           outputVectors{std::move(outputVectors)} {}
     virtual ~TableScanState() = default;
     DELETE_COPY_AND_MOVE(TableScanState);
+
+    template<typename T>
+    const T& constCast() {
+        return common::ku_dynamic_cast<const TableScanState&, const T&>(*this);
+    }
+    template<typename T>
+    T& cast() {
+        return common::ku_dynamic_cast<TableScanState&, T&>(*this);
+    }
 };
 
 struct TableInsertState {

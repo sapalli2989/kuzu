@@ -18,18 +18,27 @@ namespace storage {
 class LocalNodeTable;
 
 struct NodeTableScanState final : TableScanState {
-    // Local storage node group.
-    LocalNodeTable* localNodeTable = nullptr;
+    std::vector<common::column_id_t> columnIDs;
 
-    explicit NodeTableScanState(std::vector<common::column_id_t> columnIDs)
-        : TableScanState{std::move(columnIDs)} {
-        dataScanState = std::make_unique<NodeDataScanState>(this->columnIDs);
-    }
-    NodeTableScanState(common::ValueVector* nodeIDVector,
+    // States for scanning from local storage.
+    // TODO(Guodong): Should by default set vectorIdx to 0 and not rely on invalid+1==0;
+    LocalNodeTable* localNodeTable = nullptr;
+    common::vector_idx_t vectorIdx = common::INVALID_VECTOR_IDX;
+    common::row_idx_t numRowsToScan = 0;
+    // TODO(Guodong): We should not keep this field, instead should let nodeGroup figure it out.
+    common::row_idx_t numTotalRows = 0;
+
+    // States for scanning from a committed node group.
+    const NodeGroup* nodeGroup = nullptr;
+
+    explicit NodeTableScanState(common::table_id_t tableID,
+        std::vector<common::column_id_t> columnIDs)
+        : TableScanState{tableID, std::move(columnIDs)} {}
+    NodeTableScanState(common::table_id_t tableID, common::ValueVector* nodeIDVector,
         std::vector<common::column_id_t> columnIDs, std::vector<common::ValueVector*> outputVectors)
-        : TableScanState{nodeIDVector, std::move(columnIDs), std::move(outputVectors)} {
-        dataScanState = std::make_unique<NodeDataScanState>(this->columnIDs);
-    }
+        : TableScanState{tableID, nodeIDVector, std::move(columnIDs), std::move(outputVectors)} {}
+
+    bool nextVector();
 };
 
 struct NodeTableInsertState final : TableInsertState {
@@ -123,15 +132,20 @@ public:
     void rollbackInMemory() override;
 
     common::node_group_idx_t getNumCommittedNodeGroups() const {
-        return tableData->getNumCommittedNodeGroups();
+        return deltaNodeGroups.getNumNodeGroups();
+        // return tableData->getNumCommittedNodeGroups();
     }
 
+    // TODO: Fix this. This is used by NodeBatchInsert.
     common::node_group_idx_t getNumNodeGroups(transaction::Transaction* transaction) const {
-        return tableData->getNumNodeGroups(transaction);
+        return deltaNodeGroups.getNumNodeGroups();
+        // return tableData->getNumNodeGroups(transaction);
     }
+    // TODO: Fix this. This is used by NodeBatchInsert.
     common::offset_t getNumTuplesInNodeGroup(const transaction::Transaction* transaction,
         common::node_group_idx_t nodeGroupIdx) const {
-        return tableData->getNumTuplesInNodeGroup(transaction, nodeGroupIdx);
+        return deltaNodeGroups.getNodeGroup(nodeGroupIdx).getNumRows();
+        // return tableData->getNumTuplesInNodeGroup(transaction, nodeGroupIdx);
     }
 
 private:

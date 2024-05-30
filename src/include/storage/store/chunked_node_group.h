@@ -12,16 +12,22 @@ class Column;
 
 class ChunkedNodeGroup {
 public:
+    // TODO: Figure out a correct consutrctor to pass in startNodeOffset.
     explicit ChunkedNodeGroup(std::vector<std::unique_ptr<ColumnChunk>> chunks)
         : chunks{std::move(chunks)}, nodeGroupIdx{common::INVALID_NODE_GROUP_IDX},
+          startNodeOffset{common::INVALID_OFFSET},
           capacity{common::StorageConstants::NODE_GROUP_SIZE}, numRows{0} {}
     ChunkedNodeGroup(const std::vector<common::LogicalType>& columnTypes, bool enableCompression,
-        uint64_t capacity);
+        uint64_t capacity, common::offset_t startOffset);
     ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& columns, bool enableCompression);
     DELETE_COPY_DEFAULT_MOVE(ChunkedNodeGroup);
     virtual ~ChunkedNodeGroup() = default;
 
+    // TODO(Guodong): Currently we rely on this field in `append` to figure out node group idx to
+    // append. Should be removed after we move `append` logic to NodeGroupCollection, which can
+    // natraully figure out node group idx.
     uint64_t getNodeGroupIdx() const { return nodeGroupIdx; }
+    common::offset_t getStartNodeOffset() const { return startNodeOffset; }
     common::vector_idx_t getNumColumns() const { return chunks.size(); }
     const ColumnChunk& getColumnChunk(common::column_id_t columnID) const {
         KU_ASSERT(columnID < chunks.size());
@@ -65,7 +71,10 @@ protected:
     std::vector<std::unique_ptr<ColumnChunk>> chunks;
 
 private:
+    // TODO: This should be removed. See comment on `getNodeGroupIdx()`. Instead, should only keep
+    // `startNodeOffset`.
     uint64_t nodeGroupIdx;
+    common::offset_t startNodeOffset;
     uint64_t capacity;
     common::row_idx_t numRows;
 };
@@ -115,7 +124,8 @@ struct NodeGroupFactory {
         const std::vector<common::LogicalType>& columnTypes, bool enableCompression,
         uint64_t capacity = common::StorageConstants::NODE_GROUP_SIZE) {
         return dataFormat == common::ColumnDataFormat::REGULAR ?
-                   std::make_unique<ChunkedNodeGroup>(columnTypes, enableCompression, capacity) :
+                   std::make_unique<ChunkedNodeGroup>(columnTypes, enableCompression, capacity,
+                       common::INVALID_OFFSET) :
                    std::make_unique<ChunkedCSRNodeGroup>(columnTypes, enableCompression);
     }
 };

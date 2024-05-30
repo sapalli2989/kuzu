@@ -28,6 +28,8 @@ struct ColumnChunkMetadata {
         : pageIdx(pageIdx), numPages(numPages), numValues(numNodesInChunk), compMeta(compMeta) {}
 };
 
+enum class ColumnChunkedType : uint8_t { IN_MEMORY = 0, ON_DISK = 1 };
+
 class BMFileHandle;
 // Base data segment covers all fixed-sized data types.
 class ColumnChunk {
@@ -126,6 +128,12 @@ private:
     uint64_t getBufferSize(uint64_t capacity_) const;
 
 protected:
+    using flush_buffer_func_t = std::function<ColumnChunkMetadata(const uint8_t*, uint64_t,
+        BMFileHandle*, common::page_idx_t, const ColumnChunkMetadata&)>;
+    using get_metadata_func_t =
+        std::function<ColumnChunkMetadata(const uint8_t*, uint64_t, uint64_t, uint64_t)>;
+
+    ColumnChunkedType type;
     common::LogicalType dataType;
     uint32_t numBytesPerValue;
     uint64_t bufferSize;
@@ -133,12 +141,11 @@ protected:
     std::unique_ptr<uint8_t[]> buffer;
     std::unique_ptr<NullColumnChunk> nullChunk;
     uint64_t numValues;
-    std::function<ColumnChunkMetadata(const uint8_t*, uint64_t, BMFileHandle*, common::page_idx_t,
-        const ColumnChunkMetadata&)>
-        flushBufferFunction;
-    std::function<ColumnChunkMetadata(const uint8_t*, uint64_t, uint64_t, uint64_t)>
-        getMetadataFunction;
+    flush_buffer_func_t flushBufferFunction;
+    get_metadata_func_t getMetadataFunction;
     bool enableCompression;
+    // Only used when the chunk is on-disk.
+    ColumnChunkMetadata metadata;
 };
 
 template<>

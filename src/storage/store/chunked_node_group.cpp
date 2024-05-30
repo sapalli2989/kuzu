@@ -47,8 +47,9 @@ void ChunkedCSRHeader::fillDefaultValues(offset_t newNumValues) const {
 }
 
 ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<LogicalType>& columnTypes,
-    bool enableCompression, uint64_t capacity)
-    : nodeGroupIdx{INVALID_NODE_GROUP_IDX}, capacity{capacity}, numRows{0} {
+    bool enableCompression, uint64_t capacity, offset_t startOffset)
+    : nodeGroupIdx{INVALID_NODE_GROUP_IDX}, startNodeOffset{startOffset}, capacity{capacity},
+      numRows{0} {
     chunks.reserve(columnTypes.size());
     for (auto& type : columnTypes) {
         chunks.push_back(
@@ -58,8 +59,8 @@ ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<LogicalType>& columnTypes,
 
 ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& columns,
     bool enableCompression)
-    : nodeGroupIdx{INVALID_NODE_GROUP_IDX}, capacity{StorageConstants::NODE_GROUP_SIZE},
-      numRows{0} {
+    : nodeGroupIdx{INVALID_NODE_GROUP_IDX}, startNodeOffset{INVALID_OFFSET},
+      capacity{StorageConstants::NODE_GROUP_SIZE}, numRows{0} {
     chunks.reserve(columns.size());
     for (auto columnID = 0u; columnID < columns.size(); columnID++) {
         chunks.push_back(ColumnChunkFactory::createColumnChunk(
@@ -201,7 +202,7 @@ ChunkedCSRNodeGroup::ChunkedCSRNodeGroup(const std::vector<LogicalType>& columnT
     bool enableCompression)
     // By default, initialize all column chunks except for the csrOffsetChunk to empty, as they
     // should be resized after csr offset calculation (e.g., during RelBatchInsert).
-    : ChunkedNodeGroup{columnTypes, enableCompression, 0 /* capacity */} {
+    : ChunkedNodeGroup{columnTypes, enableCompression, 0 /* capacity */, INVALID_OFFSET} {
     csrHeader = ChunkedCSRHeader(enableCompression);
 }
 

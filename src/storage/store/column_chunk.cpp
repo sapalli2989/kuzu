@@ -150,8 +150,9 @@ static std::shared_ptr<CompressionAlg> getCompression(const LogicalType& dataTyp
 
 ColumnChunk::ColumnChunk(LogicalType dataType, uint64_t capacity, bool enableCompression,
     bool hasNullChunk)
-    : dataType{std::move(dataType)}, numBytesPerValue{getDataTypeSizeInChunk(this->dataType)},
-      numValues{0}, enableCompression(enableCompression) {
+    : type{ColumnChunkedType::IN_MEMORY}, dataType{std::move(dataType)},
+      numBytesPerValue{getDataTypeSizeInChunk(this->dataType)}, numValues{0},
+      enableCompression(enableCompression) {
     if (hasNullChunk) {
         nullChunk = std::make_unique<NullColumnChunk>(capacity, enableCompression);
     }

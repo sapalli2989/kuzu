@@ -13,6 +13,11 @@ public:
 
     void append(const ChunkedNodeGroupCollection& chunkedGroupCollection);
     common::row_idx_t getNumRows() const;
+    common::node_group_idx_t getNumNodeGroups() const { return nodeGroups.size(); }
+    const NodeGroup& getNodeGroup(common::node_group_idx_t groupIdx) const {
+        KU_ASSERT(groupIdx < nodeGroups.size());
+        return nodeGroups[groupIdx];
+    }
 
 private:
     std::vector<common::LogicalType> types;
