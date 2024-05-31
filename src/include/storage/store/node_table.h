@@ -121,9 +121,8 @@ public:
     common::column_id_t getNumColumns() const { return tableData->getNumColumns(); }
     Column* getColumn(common::column_id_t columnID) const { return tableData->getColumn(columnID); }
 
-    void append(transaction::Transaction* transaction, ChunkedNodeGroup* nodeGroup) {
-        tableData->append(transaction, nodeGroup);
-    }
+    common::offset_t append(transaction::Transaction* transaction, ChunkedNodeGroup* nodeGroup,
+        common::offset_t startOffsetToAppend, common::row_idx_t numRowsToAppend);
 
     void prepareCommit(transaction::Transaction* transaction, LocalTable* localTable) override;
     void prepareCommit() override;
@@ -132,20 +131,17 @@ public:
     void rollbackInMemory() override;
 
     common::node_group_idx_t getNumCommittedNodeGroups() const {
-        return deltaNodeGroups.getNumNodeGroups();
-        // return tableData->getNumCommittedNodeGroups();
+        return deltaNodeGroups->getNumNodeGroups();
     }
 
     // TODO: Fix this. This is used by NodeBatchInsert.
-    common::node_group_idx_t getNumNodeGroups(transaction::Transaction* transaction) const {
-        return deltaNodeGroups.getNumNodeGroups();
-        // return tableData->getNumNodeGroups(transaction);
+    common::node_group_idx_t getNumNodeGroups(transaction::Transaction*) const {
+        return deltaNodeGroups->getNumNodeGroups();
     }
     // TODO: Fix this. This is used by NodeBatchInsert.
-    common::offset_t getNumTuplesInNodeGroup(const transaction::Transaction* transaction,
+    common::offset_t getNumTuplesInNodeGroup(const transaction::Transaction*,
         common::node_group_idx_t nodeGroupIdx) const {
-        return deltaNodeGroups.getNodeGroup(nodeGroupIdx).getNumRows();
-        // return tableData->getNumTuplesInNodeGroup(transaction, nodeGroupIdx);
+        return deltaNodeGroups->getNodeGroup(nodeGroupIdx).getNumRows();
     }
 
 private:
@@ -157,7 +153,7 @@ private:
 private:
     std::mutex mtx;
     std::unique_ptr<NodeTableData> tableData;
-    NodeGroupCollection deltaNodeGroups;
+    std::unique_ptr<NodeGroupCollection> deltaNodeGroups;
     common::column_id_t pkColumnID;
     std::unique_ptr<PrimaryKeyIndex> pkIndex;
 };

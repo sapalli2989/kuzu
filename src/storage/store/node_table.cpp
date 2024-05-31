@@ -41,7 +41,7 @@ NodeTable::NodeTable(StorageManager* storageManager, NodeTableCatalogEntry* node
         storageManager->getMetadataFH(), nodeTableEntry, bufferManager, wal,
         nodeTableEntry->getPropertiesRef(), storageManager->getNodesStatisticsAndDeletedIDs(),
         storageManager->compressionEnabled());
-    deltaNodeGroups = NodeGroupCollection{getTableColumnTypes(*this)};
+    deltaNodeGroups = std::make_unique<NodeGroupCollection>(getTableColumnTypes(*this));
     initializePKIndex(storageManager->getDatabasePath(), nodeTableEntry,
         storageManager->isReadOnly(), vfs, context);
 }
@@ -63,7 +63,7 @@ void NodeTable::initializeScanState(Transaction* transaction, TableScanState& sc
     case TableScanSource::COMMITTED: {
         auto& nodeScanState = scanState.cast<NodeTableScanState>();
         // TODO(Guodong): Should we move nodeGroup into nodeGroupScanState?
-        nodeScanState.nodeGroup = &deltaNodeGroups.getNodeGroup(scanState.nodeGroupIdx);
+        nodeScanState.nodeGroup = &deltaNodeGroups->getNodeGroup(scanState.nodeGroupIdx);
         nodeScanState.nodeGroup->initializeScanState(transaction, scanState);
     } break;
     case TableScanSource::UNCOMMITTED: {
@@ -220,6 +220,11 @@ void NodeTable::addColumn(Transaction* transaction, const Property& property,
     wal->addToUpdatedTables(tableID);
 }
 
+offset_t NodeTable::append(Transaction* transaction, ChunkedNodeGroup* chunkedGroup,
+    offset_t startOffsetToAppend, row_idx_t numRowsToAppend) {
+    deltaNodeGroups->merge(transaction, chunkedGroup->getNodeGroupIdx(), *chunkedGroup);
+}
+
 void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) {
     std::unique_lock xLck{mtx};
     const auto localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
@@ -227,7 +232,7 @@ void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) 
     const auto nodesStats =
         ku_dynamic_cast<TablesStatistics*, NodesStoreStatsAndDeletedIDs*>(tablesStatistics);
     const auto numNodesCheckpointed = nodesStats->getNumTuplesForTable(transaction, tableID);
-    auto startNodeOffset = numNodesCheckpointed + deltaNodeGroups.getNumRows();
+    auto startNodeOffset = numNodesCheckpointed + deltaNodeGroups->getNumRows();
 
     // 2. Populate hash index.
     std::vector<column_id_t> columnsToScan{pkColumnID};
@@ -255,7 +260,7 @@ void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) 
     }
 
     // 3. Append the node groups to the table data.
-    deltaNodeGroups.append(localNodeTable->getChunkedGroups());
+    deltaNodeGroups->append(localNodeTable->getChunkedGroups());
 
     if (pkIndex) {
         pkIndex->prepareCommit();

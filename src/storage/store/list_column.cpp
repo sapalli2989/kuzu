@@ -62,6 +62,18 @@ ListColumn::ListColumn(std::string name, LogicalType dataType,
         metadataFH, bufferManager, wal, transaction, enableCompression);
 }
 
+std::unique_ptr<ColumnChunk> ListColumn::flushChunk(const ColumnChunk& chunk,
+    BMFileHandle& dataFH) {
+    auto flushedChunk = flushNonNestedChunk(chunk, dataFH);
+    auto& listChunk = chunk.constCast<ListColumnChunk>();
+    auto& flushedListChunk = flushedChunk->cast<ListColumnChunk>();
+    flushedListChunk.setSizeColumnChunk(
+        Column::flushChunk(*listChunk.getSizeColumnChunk(), dataFH));
+    flushedListChunk.setDataColumnChunk(
+        Column::flushChunk(*listChunk.getDataColumnChunk(), dataFH));
+    return flushedChunk;
+}
+
 void ListColumn::initChunkState(Transaction* transaction, node_group_idx_t nodeGroupIdx,
     ChunkState& readState) {
     Column::initChunkState(transaction, nodeGroupIdx, readState);

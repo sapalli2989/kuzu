@@ -12,6 +12,8 @@ public:
         BufferManager* bufferManager, WAL* wal, transaction::Transaction* transaction,
         bool enableCompression);
 
+    static std::unique_ptr<ColumnChunk> flushChunk(const ColumnChunk& chunk, BMFileHandle& dataFH);
+
     void initChunkState(transaction::Transaction* transaction,
         common::node_group_idx_t nodeGroupIdx, ChunkState& chunkState) override;
     void scan(transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx,

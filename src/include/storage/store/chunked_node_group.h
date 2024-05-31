@@ -67,6 +67,8 @@ public:
         chunks[chunkIdx]->write(data[vectorIdx].get(), &offsetChunk, common::RelMultiplicity::ONE);
     }
 
+    std::unique_ptr<ChunkedNodeGroup> flush(BMFileHandle& dataFH) const;
+
 protected:
     std::vector<std::unique_ptr<ColumnChunk>> chunks;
 

@@ -8,6 +8,14 @@ using namespace kuzu::transaction;
 namespace kuzu {
 namespace storage {
 
+void NodeGroup::append(Transaction* transaction, const ChunkedNodeGroup& chunkedGroup) {
+    chunkedGroups.append(transaction, chunkedGroup);
+}
+
+void NodeGroup::append(Transaction*, std::unique_ptr<ChunkedNodeGroup> chunkedGroup) {
+    chunkedGroups.merge(std::move(chunkedGroup));
+}
+
 void NodeGroup::initializeScanState(Transaction*, TableScanState& state) const {
     auto& nodeGroupState = state.nodeGroupScanState;
     // TODO: Should handle transaction to resolve version visibility here.
@@ -45,6 +53,25 @@ void NodeGroup::scan(Transaction*, TableScanState& state) const {
     state.nodeIDVector->state->getSelVectorUnsafe().setToUnfiltered(numRowsToScan);
 
     nodeGroupState.nextRowToScan += numRowsToScan;
+}
+
+void NodeGroup::flush(BMFileHandle& dataFH) {
+    if (chunkedGroups.getNumChunkedGroups() == 0) {
+        return;
+    }
+    if (chunkedGroups.getNumChunkedGroups() == 1) {
+        auto flushedChunkGroup = chunkedGroups.getChunkedGroup(0).flush(dataFH);
+        chunkedGroups.setChunkedGroup(0, std::move(flushedChunkGroup));
+    }
+    // Merge all chunkedGroups into a single one first. Then flush it to disk.
+    // TODO: Should take `enableCompression` as a param from `NodeGroup`.
+    auto mergedChunkedGroup = std::make_unique<ChunkedNodeGroup>(dataTypes,
+        true /*enableCompression*/, StorageConstants::NODE_GROUP_SIZE, 0);
+    for (auto& chunkedGroup : chunkedGroups.getChunkedGroups()) {
+        mergedChunkedGroup->append(*chunkedGroup, 0, chunkedGroup->getNumRows());
+    }
+    mergedChunkedGroup->flush(dataFH);
+    chunkedGroups.setChunkedGroup(0, std::move(mergedChunkedGroup));
 }
 
 } // namespace storage

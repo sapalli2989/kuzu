@@ -241,6 +241,43 @@ Column* Column::getNullColumn() const {
     return nullColumn.get();
 }
 
+std::unique_ptr<ColumnChunk> Column::flushChunk(const ColumnChunk& chunk, BMFileHandle& dataFH) {
+    switch (chunk.getDataType().getPhysicalType()) {
+    case PhysicalTypeID::STRUCT: {
+        return StructColumn::flushChunk(chunk, dataFH);
+    }
+    case PhysicalTypeID::STRING: {
+        return StringColumn::flushChunk(chunk, dataFH);
+    }
+    case PhysicalTypeID::ARRAY:
+    case PhysicalTypeID::LIST: {
+        return ListColumn::flushChunk(chunk, dataFH);
+    }
+    default: {
+        return flushNonNestedChunk(chunk, dataFH);
+    }
+    }
+}
+
+std::unique_ptr<ColumnChunk> Column::flushNonNestedChunk(const ColumnChunk& chunk,
+    BMFileHandle& dataFH) {
+    KU_ASSERT(chunk.sanityCheck());
+    auto preScanMetadata = chunk.getMetadataToFlush();
+    auto startPageIdx = dataFH.addNewPages(preScanMetadata.numPages);
+    auto hasNullChunk = chunk.getNullChunk();
+    auto flushedChunk = std::make_unique<ColumnChunk>(chunk.getDataType(), 0,
+        chunk.isCompressionEnabled(), hasNullChunk);
+    flushedChunk->setMetadata(chunk.flushBuffer(&dataFH, startPageIdx, preScanMetadata));
+    if (hasNullChunk) {
+        const auto nullChunk = chunk.getNullChunk();
+        preScanMetadata = nullChunk->getMetadataToFlush();
+        startPageIdx = dataFH.addNewPages(preScanMetadata.numPages);
+        flushedChunk->getNullChunk()->setMetadata(
+            nullChunk->flushBuffer(&dataFH, startPageIdx, preScanMetadata));
+    }
+    return flushedChunk;
+}
+
 // NOTE: This function should only be called on node tables.
 void Column::batchLookup(Transaction* transaction, const offset_t* nodeOffsets, size_t size,
     uint8_t* result) {

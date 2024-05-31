@@ -23,8 +23,12 @@ public:
 
     std::string_view getString(string_index_t index) const;
 
-    inline ColumnChunk* getStringDataChunk() const { return stringDataChunk.get(); }
-    inline ColumnChunk* getOffsetChunk() const { return offsetChunk.get(); }
+    ColumnChunk* getStringDataChunk() const { return stringDataChunk.get(); }
+    ColumnChunk* getOffsetChunk() const { return offsetChunk.get(); }
+    void setOffsetChunk(std::unique_ptr<ColumnChunk> chunk) { offsetChunk = std::move(chunk); }
+    void setStringDataChunk(std::unique_ptr<ColumnChunk> chunk) {
+        stringDataChunk = std::move(chunk);
+    }
 
     bool sanityCheck() const;
 

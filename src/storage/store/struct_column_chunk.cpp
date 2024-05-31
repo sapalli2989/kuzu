@@ -105,7 +105,7 @@ void StructColumnChunk::write(ColumnChunk* chunk, ColumnChunk* dstOffsets,
     }
     auto structChunk = ku_dynamic_cast<ColumnChunk*, StructColumnChunk*>(chunk);
     for (auto i = 0u; i < childChunks.size(); i++) {
-        childChunks[i]->write(structChunk->getChild(i), dstOffsets, multiplicity);
+        childChunks[i]->write(&structChunk->getChild(i), dstOffsets, multiplicity);
     }
 }
 

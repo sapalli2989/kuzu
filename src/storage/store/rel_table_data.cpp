@@ -310,7 +310,7 @@ bool RelTableData::checkIfNodeHasRels(Transaction* transaction, offset_t nodeOff
     return length > 0;
 }
 
-void RelTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup) {
+offset_t RelTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup) {
     auto csrNodeGroup = ku_dynamic_cast<ChunkedNodeGroup*, ChunkedCSRNodeGroup*>(nodeGroup);
     Column::ChunkState csrOffsetState, csrLengthState;
     csrHeaderColumns.offset->initChunkState(transaction, csrNodeGroup->getNodeGroupIdx(),
@@ -324,6 +324,7 @@ void RelTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup)
         column->initChunkState(&DUMMY_WRITE_TRANSACTION, csrNodeGroup->getNodeGroupIdx(), state);
         getColumn(columnID)->append(&nodeGroup->getColumnChunkUnsafe(columnID), state);
     }
+    return StorageUtils::getStartOffsetOfNodeGroup(nodeGroup->getNodeGroupIdx());
 }
 
 static length_t getGapSizeForNode(const ChunkedCSRHeader& header, offset_t nodeOffset) {

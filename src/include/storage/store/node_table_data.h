@@ -37,7 +37,8 @@ public:
         const std::vector<common::ValueVector*>& outputVectors) override;
 
     // Flush the nodeGroup to disk and update metadataDAs.
-    void append(transaction::Transaction* transaction, ChunkedNodeGroup* nodeGroup) override;
+    common::offset_t append(transaction::Transaction* transaction,
+        ChunkedNodeGroup* nodeGroup) override;
 
     // void prepareLocalNodeGroupToCommit(common::node_group_idx_t nodeGroupIdx,
     // transaction::Transaction* transaction, LocalNodeNG* localNodeGroup) const;

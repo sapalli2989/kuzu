@@ -147,7 +147,7 @@ void NodeTableData::lookup(Transaction* transaction, TableDataScanState& readSta
     //     }
 }
 
-void NodeTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup) {
+offset_t NodeTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup) {
     for (auto columnID = 0u; columnID < columns.size(); columnID++) {
         auto& columnChunk = nodeGroup->getColumnChunkUnsafe(columnID);
         KU_ASSERT(columnID < columns.size());
@@ -156,6 +156,7 @@ void NodeTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeGroup
         column->initChunkState(transaction, nodeGroup->getNodeGroupIdx(), state);
         columns[columnID]->append(&columnChunk, state);
     }
+    return nodeGroup->getNodeGroupIdx() * StorageConstants::NODE_GROUP_SIZE;
 }
 
 } // namespace storage

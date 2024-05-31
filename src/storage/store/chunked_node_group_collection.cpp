@@ -1,6 +1,7 @@
 #include "storage/store/chunked_node_group_collection.h"
 
 using namespace kuzu::common;
+using namespace kuzu::transaction;
 
 namespace kuzu {
 namespace storage {
@@ -33,13 +34,34 @@ void ChunkedNodeGroupCollection::append(const std::vector<ValueVector*>& vectors
     }
 }
 
-void ChunkedNodeGroupCollection::append(const ChunkedNodeGroupCollection& other, offset_t offset,
-    offset_t numRowsToAppend) {
-    row_idx_t numRowsAppended = 0u;
+void ChunkedNodeGroupCollection::append(Transaction*, const ChunkedNodeGroup& chunkedGroup) {
     if (chunkedGroups.empty()) {
         chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
             false /*enableCompression*/, CHUNK_CAPACITY, 0 /*startOffset*/));
     }
+    row_idx_t numRowsAppended = 0u;
+    row_idx_t numRowsToAppend = chunkedGroup.getNumRows();
+    while (numRowsAppended < numRowsToAppend) {
+        if (chunkedGroups.back()->isFull()) {
+            chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
+                false /*enableCompression*/, CHUNK_CAPACITY, getNumRows()));
+        }
+        const auto& chunkedGroupToCopyInto = chunkedGroups.back();
+        KU_ASSERT(CHUNK_CAPACITY >= chunkedGroupToCopyInto->getNumRows());
+        auto numToCopyIntoChunk = CHUNK_CAPACITY - chunkedGroupToCopyInto->getNumRows();
+        const auto numToAppendInChunk = std::min(chunkedGroup.getNumRows(), numToCopyIntoChunk);
+        chunkedGroupToCopyInto->append(chunkedGroup, 0, numToAppendInChunk);
+        numRowsAppended += numToAppendInChunk;
+    }
+}
+
+void ChunkedNodeGroupCollection::append(const ChunkedNodeGroupCollection& other, offset_t offset,
+    offset_t numRowsToAppend) {
+    if (chunkedGroups.empty()) {
+        chunkedGroups.push_back(std::make_unique<ChunkedNodeGroup>(types,
+            false /*enableCompression*/, CHUNK_CAPACITY, 0 /*startOffset*/));
+    }
+    row_idx_t numRowsAppended = 0u;
     while (numRowsAppended < numRowsToAppend) {
         const auto chunkIdx = offset / CHUNK_CAPACITY;
         const auto offsetInChunk = offset % CHUNK_CAPACITY;

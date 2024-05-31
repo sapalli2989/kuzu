@@ -67,7 +67,7 @@ offset_t ListColumnChunk::getListEndOffset(offset_t offset) const {
     return getValue<uint64_t>(offset);
 }
 
-list_size_t ListColumnChunk::getListSize(common::offset_t offset) const {
+list_size_t ListColumnChunk::getListSize(offset_t offset) const {
     if (numValues == 0)
         return 0;
     KU_ASSERT(offset < sizeColumnChunk->getNumValues());
@@ -340,7 +340,7 @@ void ListColumnChunk::finalize() {
         }
         currentIndex++;
     }
-    newListChunk->sanityCheck();
+    KU_ASSERT(newListChunk->sanityCheck());
     // Move offsets, null, data from newListChunk to this column chunk. And release indices.
     resetFromOtherChunk(newListChunk);
 }
@@ -353,7 +353,7 @@ void ListColumnChunk::resetFromOtherChunk(ListColumnChunk* other) {
     checkOffsetSortedAsc = false;
 }
 
-bool ListColumnChunk::sanityCheck() {
+bool ListColumnChunk::sanityCheck() const {
     KU_ASSERT(ColumnChunk::sanityCheck());
     KU_ASSERT(sizeColumnChunk->sanityCheck());
     KU_ASSERT(getDataColumnChunk()->sanityCheck());

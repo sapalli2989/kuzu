@@ -38,9 +38,14 @@ public:
         common::row_idx_t numRowsToAppend) {
         chunkedGroups.append(chunkCollection, offset, numRowsToAppend);
     }
+    void append(transaction::Transaction* transaction, const ChunkedNodeGroup& chunkedGroup);
+    void append(transaction::Transaction* transaction,
+        std::unique_ptr<ChunkedNodeGroup> chunkedGroup);
 
     void initializeScanState(transaction::Transaction* transaction, TableScanState& state) const;
     void scan(transaction::Transaction* transaction, TableScanState& state) const;
+
+    void flush(BMFileHandle& dataFH);
 
 private:
     common::node_group_idx_t nodeGroupIdx;

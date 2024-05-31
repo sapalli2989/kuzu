@@ -23,14 +23,15 @@ LocalNodeTable::LocalNodeTable(Table& table)
 
 bool LocalNodeTable::insert(TableInsertState& insertState) {
     auto& nodeInsertState = insertState.constCast<NodeTableInsertState>();
-    auto numRowsInLocalTable = chunkedGroups.getNumRows();
-    auto nodeOffset = StorageConstants::MAX_NUM_NODES_IN_TABLE + numRowsInLocalTable;
+    const auto numRowsInLocalTable = chunkedGroups.getNumRows();
+    const auto nodeOffset = StorageConstants::MAX_NUM_NODES_IN_TABLE + numRowsInLocalTable;
     KU_ASSERT(nodeInsertState.pkVector.state->getSelVector().getSelSize() == 1);
     if (!hashIndex->insert(nodeInsertState.pkVector, nodeOffset)) {
         throw RuntimeException(
             stringFormat("Found duplicate primary key in local table {}", table.getTableID()));
     }
-    auto nodeIDPos = nodeInsertState.nodeIDVector.state->getSelVector().getSelectedPositions()[0];
+    const auto nodeIDPos =
+        nodeInsertState.nodeIDVector.state->getSelVector().getSelectedPositions()[0];
     nodeInsertState.nodeIDVector.setValue(nodeIDPos, internalID_t{nodeOffset, table.getTableID()});
     // TODO(Guodong): Assume all property vectors have the same selVector here. Should be changed.
     chunkedGroups.append(insertState.propertyVectors,
@@ -55,9 +56,9 @@ void LocalNodeTable::initializeScanState(TableScanState& scanState) const {
 
 void LocalNodeTable::scan(TableScanState& scanState) const {
     KU_ASSERT(scanState.source == TableScanSource::UNCOMMITTED);
-    auto& nodeScanState = scanState.cast<NodeTableScanState>();
-    auto startNodeOffset = StorageConstants::MAX_NUM_NODES_IN_TABLE +
-                           nodeScanState.vectorIdx * DEFAULT_VECTOR_CAPACITY;
+    auto& nodeScanState = scanState.constCast<NodeTableScanState>();
+    const auto startNodeOffset = StorageConstants::MAX_NUM_NODES_IN_TABLE +
+                                 nodeScanState.vectorIdx * DEFAULT_VECTOR_CAPACITY;
     for (auto i = 0u; i < nodeScanState.numRowsToScan; i++) {
         scanState.nodeIDVector->setValue(i, nodeID_t{startNodeOffset + i, table.getTableID()});
     }

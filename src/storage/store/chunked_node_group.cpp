@@ -171,6 +171,14 @@ void ChunkedNodeGroup::finalize(uint64_t nodeGroupIdx_) {
     }
 }
 
+std::unique_ptr<ChunkedNodeGroup> ChunkedNodeGroup::flush(BMFileHandle& dataFH) const {
+    std::vector<std::unique_ptr<ColumnChunk>> flushedChunks(getNumColumns());
+    for (auto i = 0u; i < getNumColumns(); i++) {
+        flushedChunks[i] = Column::flushChunk(getColumnChunk(i), dataFH);
+    }
+    return std::make_unique<ChunkedNodeGroup>(std::move(flushedChunks));
+}
+
 ChunkedCSRHeader::ChunkedCSRHeader(bool enableCompression, uint64_t capacity) {
     offset =
         ColumnChunkFactory::createColumnChunk(*LogicalType::UINT64(), enableCompression, capacity);

@@ -56,6 +56,10 @@ public:
         bool requireNullColumn = true);
     virtual ~Column();
 
+    static std::unique_ptr<ColumnChunk> flushChunk(const ColumnChunk& chunk, BMFileHandle& dataFH);
+    static std::unique_ptr<ColumnChunk> flushNonNestedChunk(const ColumnChunk& chunk,
+        BMFileHandle& dataFH);
+
     // Expose for feature store
     virtual void batchLookup(transaction::Transaction* transaction,
         const common::offset_t* nodeOffsets, size_t size, uint8_t* result);

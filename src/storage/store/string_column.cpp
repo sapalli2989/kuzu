@@ -25,6 +25,20 @@ StringColumn::StringColumn(std::string name, LogicalType dataType,
       dictionary{name, metaDAHeaderInfo, dataFH, metadataFH, bufferManager, wal, transaction,
           enableCompression} {}
 
+std::unique_ptr<ColumnChunk> StringColumn::flushChunk(const ColumnChunk& chunk,
+    BMFileHandle& dataFH) {
+    auto flushedChunk = flushNonNestedChunk(chunk, dataFH);
+    auto& flushedStringChunk = flushedChunk->cast<StringColumnChunk>();
+
+    auto& stringChunk = chunk.constCast<StringColumnChunk>();
+    auto& dictChunk = stringChunk.getDictionaryChunk();
+    flushedStringChunk.getDictionaryChunk().setOffsetChunk(
+        Column::flushChunk(*dictChunk.getOffsetChunk(), dataFH));
+    flushedStringChunk.getDictionaryChunk().setStringDataChunk(
+        Column::flushChunk(*dictChunk.getStringDataChunk(), dataFH));
+    return flushedChunk;
+}
+
 void StringColumn::initChunkState(Transaction* transaction, node_group_idx_t nodeGroupIdx,
     ChunkState& state) {
     Column::initChunkState(transaction, nodeGroupIdx, state);

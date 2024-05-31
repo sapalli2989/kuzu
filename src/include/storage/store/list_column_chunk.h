@@ -32,8 +32,13 @@ public:
         bool inMemory);
 
     ColumnChunk* getDataColumnChunk() const { return listDataColumnChunk->dataColumnChunk.get(); }
-
     ColumnChunk* getSizeColumnChunk() const { return sizeColumnChunk.get(); }
+    void setDataColumnChunk(std::unique_ptr<ColumnChunk> dataColumnChunk) {
+        listDataColumnChunk->dataColumnChunk = std::move(dataColumnChunk);
+    }
+    void setSizeColumnChunk(std::unique_ptr<ColumnChunk> sizeColumnChunk_) {
+        sizeColumnChunk = std::move(sizeColumnChunk_);
+    }
 
     void resetToEmpty() override;
 
@@ -74,7 +79,7 @@ public:
     void resetFromOtherChunk(ListColumnChunk* other);
     void finalize() override;
     bool isOffsetsConsecutiveAndSortedAscending(uint64_t startPos, uint64_t endPos) const;
-    bool sanityCheck() override;
+    bool sanityCheck() const override;
 
 protected:
     void copyListValues(const common::list_entry_t& entry, common::ValueVector* dataVector);

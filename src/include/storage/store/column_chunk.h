@@ -59,8 +59,7 @@ public:
         return ((T*)buffer.get())[pos];
     }
 
-    NullColumnChunk* getNullChunk() { return nullChunk.get(); }
-    const NullColumnChunk& getNullChunk() const { return *nullChunk; }
+    NullColumnChunk* getNullChunk() const { return nullChunk.get(); }
     common::LogicalType& getDataType() { return dataType; }
     const common::LogicalType& getDataType() const { return dataType; }
 
@@ -68,13 +67,14 @@ public:
 
     // Note that the startPageIdx is not known, so it will always be common::INVALID_PAGE_IDX
     virtual ColumnChunkMetadata getMetadataToFlush() const;
+    void setMetadata(const ColumnChunkMetadata& metadata_) { metadata = metadata_; }
 
     virtual void append(common::ValueVector* vector, const common::SelectionVector& selVector);
     virtual void append(ColumnChunk* other, common::offset_t startPosInOtherChunk,
         uint32_t numValuesToAppend);
 
     ColumnChunkMetadata flushBuffer(BMFileHandle* dataFH, common::page_idx_t startPageIdx,
-        const ColumnChunkMetadata& metadata);
+        const ColumnChunkMetadata& metadata) const;
 
     static common::page_idx_t getNumPagesForBytes(uint64_t numBytes) {
         return (numBytes + common::BufferPoolConstants::PAGE_4KB_SIZE - 1) /
@@ -114,7 +114,16 @@ public:
     virtual bool numValuesSanityCheck() const;
     bool isCompressionEnabled() const { return enableCompression; }
 
-    virtual bool sanityCheck();
+    virtual bool sanityCheck() const;
+
+    template<typename T>
+    T& cast() {
+        return common::ku_dynamic_cast<ColumnChunk&, T&>(*this);
+    }
+    template<typename T>
+    const T& constCast() const {
+        return common::ku_dynamic_cast<const ColumnChunk&, const T&>(*this);
+    }
 
 protected:
     // Initializes the data buffer. Is (and should be) only called in constructor.

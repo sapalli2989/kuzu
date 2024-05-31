@@ -388,7 +388,7 @@ bool ColumnChunk::numValuesSanityCheck() const {
     return numValues <= capacity;
 }
 
-bool ColumnChunk::sanityCheck() {
+bool ColumnChunk::sanityCheck() const {
     if (nullChunk) {
         return nullChunk->sanityCheck() && numValuesSanityCheck();
     }
@@ -409,7 +409,7 @@ ColumnChunkMetadata ColumnChunk::getMetadataToFlush() const {
 }
 
 ColumnChunkMetadata ColumnChunk::flushBuffer(BMFileHandle* dataFH, page_idx_t startPageIdx,
-    const ColumnChunkMetadata& metadata) {
+    const ColumnChunkMetadata& metadata) const {
     if (!metadata.compMeta.isConstant()) {
         KU_ASSERT(bufferSize == getBufferSize(capacity));
         return flushBufferFunction(buffer.get(), bufferSize, dataFH, startPageIdx, metadata);
