@@ -13,6 +13,7 @@
 #include "common/types/interval_t.h"
 #include "common/types/ku_list.h"
 #include "common/types/ku_string.h"
+#include "function/cast/functions/numeric_limits.h"
 #include "function/built_in_function_utils.h"
 
 using kuzu::function::BuiltInFunctionsUtils;
@@ -1642,6 +1643,20 @@ static inline bool isSemanticallyNested(LogicalTypeID ID) {
     return LogicalTypeUtils::isNested(ID) && ID != LogicalTypeID::RDF_VARIANT;
 }
 
+static inline bool tryCombineDecimalTypes(const LogicalType& left, const LogicalType& right, LogicalType& result) {
+    auto precisionLeft = DecimalType::getPrecision(left);
+    auto scaleLeft = DecimalType::getScale(left);
+    auto precisionRight = DecimalType::getPrecision(right);
+    auto scaleRight = DecimalType::getScale(right);
+    auto resultingScale = std::max(scaleLeft, scaleRight);
+    auto resultingPrecision = std::max(precisionLeft - scaleLeft, precisionRight - scaleRight) + resultingScale;
+    if (resultingPrecision > function::DECIMAL_PRECISION_LIMIT) {
+        return false;
+    }
+    result = *LogicalType::DECIMAL(resultingPrecision, resultingScale);
+    return true;
+}
+
 bool LogicalTypeUtils::tryGetMaxLogicalType(const LogicalType& left, const LogicalType& right,
     LogicalType& result) {
     if (canAlwaysCast(left.typeID) && canAlwaysCast(right.typeID)) {
@@ -1659,6 +1674,9 @@ bool LogicalTypeUtils::tryGetMaxLogicalType(const LogicalType& left, const Logic
     if (canAlwaysCast(right.typeID)) {
         result = left;
         return true;
+    }
+    if (left.typeID == LogicalTypeID::DECIMAL && right.typeID == LogicalTypeID::DECIMAL) {
+        return tryCombineDecimalTypes(left, right, result);
     }
     if (isSemanticallyNested(left.typeID) || isSemanticallyNested(right.typeID)) {
         if (left.typeID == LogicalTypeID::LIST && right.typeID == LogicalTypeID::ARRAY) {
@@ -1690,7 +1708,14 @@ bool LogicalTypeUtils::tryGetMaxLogicalType(const LogicalType& left, const Logic
     if (!tryGetMaxLogicalTypeID(left.typeID, right.typeID, resultID)) {
         return false;
     }
-    result = LogicalType(resultID);
+    // attempt to make complete types first
+    if (resultID == left.typeID) {
+        result = left;
+    } else if (resultID == right.typeID) {
+        result = right;
+    } else {
+        result = LogicalType(resultID);
+    }
     return true;
 }
 

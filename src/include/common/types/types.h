@@ -597,11 +597,12 @@ struct LogicalTypeUtils {
     static std::vector<LogicalTypeID> getNumericalLogicalTypeIDs();
     static std::vector<LogicalTypeID> getIntegerTypeIDs();
     static std::vector<LogicalTypeID> getAllValidLogicTypes();
-    static bool tryGetMaxLogicalTypeID(const LogicalTypeID& left, const LogicalTypeID& right,
-        LogicalTypeID& result);
     static bool tryGetMaxLogicalType(const LogicalType& left, const LogicalType& right,
         LogicalType& result);
     static bool tryGetMaxLogicalType(const std::vector<LogicalType>& types, LogicalType& result);
+private:
+    static bool tryGetMaxLogicalTypeID(const LogicalTypeID& left, const LogicalTypeID& right,
+        LogicalTypeID& result);
 };
 
 enum class FileVersionType : uint8_t { ORIGINAL = 0, WAL_VERSION = 1 };
