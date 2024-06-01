@@ -109,7 +109,7 @@ public:
     // For metadata-only updates
     virtual void prepareCommit() = 0;
     virtual void prepareRollback(LocalTable* localTable) = 0;
-    virtual void checkpointInMemory() = 0;
+    virtual void checkpoint() = 0;
     virtual void rollbackInMemory() = 0;
 
     template<class TARGET>
@@ -119,6 +119,7 @@ public:
 
 protected:
     virtual bool scanInternal(transaction::Transaction* transaction, TableScanState& scanState) = 0;
+    virtual void checkpointInMemory() = 0;
 
 protected:
     common::TableType tableType;

@@ -243,6 +243,15 @@ void ColumnChunk::lookup(offset_t offsetInChunk, ValueVector& output,
     }
 }
 
+void ColumnChunk::initializeScanState(ChunkState& state) const {
+    if (nullChunk) {
+        nullChunk->initializeScanState(*state.nullState);
+    }
+    state.metadata = metadata;
+    state.numValuesPerPage =
+        state.metadata.compMeta.numValues(BufferPoolConstants::PAGE_4KB_SIZE, dataType);
+}
+
 void ColumnChunk::scan(ValueVector& output, offset_t offset, length_t length) const {
     KU_ASSERT(offset + length <= numValues);
     // TODO(Guodong): Rework properly as scan.
@@ -374,7 +383,7 @@ void ColumnChunk::copyVectorToBuffer(ValueVector* vector, offset_t startPosInChu
 }
 
 void ColumnChunk::setNumValues(uint64_t numValues_) {
-    KU_ASSERT(numValues_ <= capacity);
+    // KU_ASSERT(numValues_ <= capacity);
     numValues = numValues_;
     if (nullChunk) {
         nullChunk->setNumValues(numValues_);

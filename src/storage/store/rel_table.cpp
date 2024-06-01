@@ -174,6 +174,10 @@ void RelTable::prepareCommit() {
     bwdRelTableData->prepareCommit();
 }
 
+void RelTable::checkpoint() {
+    checkpointInMemory();
+}
+
 void RelTable::checkpointInMemory() {
     fwdRelTableData->checkpointInMemory();
     bwdRelTableData->checkpointInMemory();

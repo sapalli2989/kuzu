@@ -32,6 +32,11 @@ public:
     void write(ChunkState& state, common::offset_t offsetInChunk, ColumnChunk* data,
         common::offset_t dataOffset, common::length_t numValues) override;
 
+    void setMetadataFromChunk(common::node_group_idx_t nodeGroupIdx,
+        const ColumnChunk& chunk) override;
+    void setMetadataToChunk(common::node_group_idx_t nodeGroupIdx,
+        ColumnChunk& chunk) const override;
+
     void prepareCommit() override;
     void checkpointInMemory() override;
     void rollbackInMemory() override;
@@ -40,7 +45,7 @@ public:
 
 protected:
     void scanInternal(transaction::Transaction* transaction, const ChunkState& state,
-        common::vector_idx_t vectorIdx, common::row_idx_t numValuesToScan,
+        common::offset_t startOffsetInChunk, common::row_idx_t numValuesToScan,
         common::ValueVector* nodeIDVector, common::ValueVector* resultVector) override;
     void scanUnfiltered(transaction::Transaction* transaction, const ChunkState& state,
         common::offset_t startOffsetInChunk, common::offset_t numValuesToRead,

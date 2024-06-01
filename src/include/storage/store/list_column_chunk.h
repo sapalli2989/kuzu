@@ -26,8 +26,10 @@ struct ListDataColumnChunk {
 };
 
 class ListColumnChunk final : public ColumnChunk {
-
 public:
+    static constexpr common::vector_idx_t SIZE_COLUMN_CHILD_READ_STATE_IDX = 0;
+    static constexpr common::vector_idx_t DATA_COLUMN_CHILD_READ_STATE_IDX = 1;
+
     ListColumnChunk(common::LogicalType dataType, uint64_t capacity, bool enableCompression,
         bool inMemory);
 
@@ -51,6 +53,7 @@ public:
 
     void lookup(common::offset_t offsetInChunk, common::ValueVector& output,
         common::sel_t posInOutputVector) const override;
+    void initializeScanState(ChunkState& state) const override;
 
     // Note: `write` assumes that no `append` will be called afterward.
     void write(common::ValueVector* vector, common::offset_t offsetInVector,

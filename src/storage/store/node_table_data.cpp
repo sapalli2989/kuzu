@@ -3,7 +3,6 @@
 #include "common/cast.h"
 #include "common/types/types.h"
 #include "storage/local_storage/local_node_table.h"
-#include "storage/local_storage/local_table.h"
 #include "storage/stats/nodes_store_statistics.h"
 #include "storage/store/node_table.h"
 #include "storage/store/table.h"
@@ -15,17 +14,6 @@ using namespace kuzu::transaction;
 
 namespace kuzu {
 namespace storage {
-
-// bool NodeDataScanState::nextVector() {
-//     vectorIdx++;
-//     const auto startOffsetInNodeGroup = vectorIdx * DEFAULT_VECTOR_CAPACITY;
-//     if (startOffsetInNodeGroup >= numRowsInNodeGroup) {
-//         numRowsToScan = 0;
-//         return false;
-//     }
-//     numRowsToScan = std::min(DEFAULT_VECTOR_CAPACITY, numRowsInNodeGroup -
-//     startOffsetInNodeGroup); return true;
-// }
 
 NodeTableData::NodeTableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
     TableCatalogEntry* tableEntry, BufferManager* bufferManager, WAL* wal,
@@ -50,77 +38,12 @@ NodeTableData::NodeTableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,
 }
 
 void NodeTableData::initializeScanState(Transaction* transaction, TableScanState& scanState) const {
-    // auto& dataScanState =
-    // ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(*scanState.dataScanState);
-    // KU_ASSERT(dataScanState.chunkStates.size() == scanState.columnIDs.size());
-    // if (scanState.dataScanState) {
-    //     initializeColumnScanStates(transaction, dataScanState, scanState.nodeGroupIdx);
-    // }
-    // if (transaction->isWriteTransaction()) {
-    // initializeLocalNodeReadState(transaction, scanState);
-    // }
-    // dataScanState.vectorIdx = INVALID_VECTOR_IDX;
-    // dataScanState.numRowsInNodeGroup =
-    // columns[0]->getMetadata(scanState.nodeGroupIdx, TransactionType::READ_ONLY).numValues;
+    KU_UNREACHABLE;
 }
-
-// void NodeTableData::initializeColumnScanStates(Transaction* transaction,
-// NodeDataScanState& scanState, node_group_idx_t nodeGroupIdx) const {
-// auto& dataReadState = ku_dynamic_cast<TableDataScanState&, NodeDataScanState&>(scanState);
-//     for (auto i = 0u; i < scanState.columnIDs.size(); i++) {
-//         if (scanState.columnIDs[i] != INVALID_COLUMN_ID) {
-//             getColumn(scanState.columnIDs[i])
-//                 ->initChunkState(transaction, nodeGroupIdx, dataReadState.chunkStates[i]);
-//         }
-//     }
-//     KU_ASSERT(sanityCheckOnColumnNumValues(dataReadState));
-// }
-
-// bool NodeTableData::sanityCheckOnColumnNumValues(const NodeDataScanState& scanState) {
-//     // Sanity check on that all valid columns should have the same numValues.
-//     const auto validColumn = std::find_if(scanState.columnIDs.begin(), scanState.columnIDs.end(),
-//         [](column_id_t columnID) { return columnID != INVALID_COLUMN_ID; });
-//     if (validColumn != scanState.columnIDs.end()) {
-//         const auto numValues =
-//             scanState.chunkStates[validColumn - scanState.columnIDs.begin()].metadata.numValues;
-//         for (auto i = 0u; i < scanState.columnIDs.size(); i++) {
-//             if (scanState.columnIDs[i] == INVALID_COLUMN_ID) {
-//                 continue;
-//             }
-//             if (scanState.chunkStates[i].metadata.numValues != numValues) {
-//                 KU_ASSERT(false);
-//                 return false;
-//             }
-//         }
-//     }
-//     return true;
-// }
-
-// void NodeTableData::initializeLocalNodeReadState(Transaction* transaction,
-//     TableScanState& scanState) const {
-//     const auto localTable = transaction->getLocalStorage()->getLocalTable(tableID,
-//         LocalStorage::NotExistAction::RETURN_NULL);
-//     auto& nodeScanState = ku_dynamic_cast<TableScanState&, NodeTableScanState&>(scanState);
-//     nodeScanState.localNodeTable = nullptr;
-//     if (localTable) {
-//         nodeScanState.localNodeTable = ku_dynamic_cast<LocalTable*, LocalNodeTable*>(localTable);
-//     }
-// }
 
 void NodeTableData::scan(Transaction* transaction, TableDataScanState& scanState,
     ValueVector& nodeIDVector, const std::vector<ValueVector*>& outputVectors) {
-    //     auto& nodeScanState =
-    //         ku_dynamic_cast<const TableDataScanState&, const NodeDataScanState&>(scanState);
-    //     for (auto i = 0u; i < scanState.columnIDs.size(); i++) {
-    //         if (scanState.columnIDs[i] == INVALID_COLUMN_ID) {
-    //             outputVectors[i]->setAllNull();
-    //         } else {
-    //             KU_ASSERT(scanState.columnIDs[i] < columns.size());
-    //             columns[scanState.columnIDs[i]]->scan(transaction, nodeScanState.chunkStates[i],
-    //                 nodeScanState.vectorIdx, nodeScanState.numRowsToScan, &nodeIDVector,
-    //                 outputVectors[i]);
-    //         }
-    //     }
+    KU_UNREACHABLE;
 }
 
 void NodeTableData::lookup(Transaction* transaction, TableDataScanState& readState,
@@ -152,11 +75,31 @@ offset_t NodeTableData::append(Transaction* transaction, ChunkedNodeGroup* nodeG
         auto& columnChunk = nodeGroup->getColumnChunkUnsafe(columnID);
         KU_ASSERT(columnID < columns.size());
         auto column = columns[columnID].get();
-        Column::ChunkState state;
+        ChunkState state;
         column->initChunkState(transaction, nodeGroup->getNodeGroupIdx(), state);
         columns[columnID]->append(&columnChunk, state);
     }
     return nodeGroup->getNodeGroupIdx() * StorageConstants::NODE_GROUP_SIZE;
+}
+
+std::unique_ptr<ChunkedNodeGroup> NodeTableData::getCommittedNodeGroup(
+    node_group_idx_t nodeGroupIdx) const {
+    std::vector<LogicalType> dataTypes;
+    for (auto& column : columns) {
+        dataTypes.push_back(column->getDataType());
+    }
+    auto chunkedNodeGroup = std::make_unique<ChunkedNodeGroup>(dataTypes, enableCompression, 0, 0);
+    for (auto columnID = 0u; columnID < columns.size(); columnID++) {
+        getColumn(columnID)->setMetadataToChunk(nodeGroupIdx,
+            chunkedNodeGroup->getColumnChunkUnsafe(columnID));
+    }
+    const row_idx_t numRows = chunkedNodeGroup->getColumnChunk(0).getFlushedMetadata().numValues;
+    for (auto columnID = 1; columnID < columns.size(); columnID++) {
+        KU_ASSERT(
+            numRows == chunkedNodeGroup->getColumnChunk(columnID).getFlushedMetadata().numValues);
+    }
+    chunkedNodeGroup->setNumRows(numRows);
+    return chunkedNodeGroup;
 }
 
 } // namespace storage

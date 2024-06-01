@@ -174,6 +174,13 @@ void ListColumnChunk::lookup(offset_t offsetInChunk, ValueVector& output,
     output.setValue<list_entry_t>(posInOutputVector, list_entry_t{currentListDataSize, listSize});
 }
 
+void ListColumnChunk::initializeScanState(ChunkState& state) const {
+    ColumnChunk::initializeScanState(state);
+    sizeColumnChunk->initializeScanState(state.childrenStates[SIZE_COLUMN_CHILD_READ_STATE_IDX]);
+    listDataColumnChunk->dataColumnChunk->initializeScanState(
+        state.childrenStates[DATA_COLUMN_CHILD_READ_STATE_IDX]);
+}
+
 void ListColumnChunk::write(ColumnChunk* chunk, ColumnChunk* dstOffsets,
     RelMultiplicity /*multiplicity*/) {
     KU_ASSERT(chunk->getDataType().getPhysicalType() == dataType.getPhysicalType() &&

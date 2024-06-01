@@ -99,13 +99,13 @@ public:
               bufferManager, wal, transaction, false /* enableCompression */,
               false /*requireNullColumn*/} {}
 
-    void scan(Transaction*, const ChunkState& chunkState, vector_idx_t vectorIdx,
+    void scan(Transaction*, const ChunkState& chunkState, offset_t startOffsetInChunk,
         row_idx_t numValuesToScan, ValueVector*, ValueVector* resultVector) override {
         // Serial column cannot contain null values.
         const auto nodeGroupStartOffset =
             StorageUtils::getStartOffsetOfNodeGroup(chunkState.nodeGroupIdx);
         for (auto i = 0ul; i < numValuesToScan; i++) {
-            const auto offset = nodeGroupStartOffset + vectorIdx * DEFAULT_VECTOR_CAPACITY + i;
+            const auto offset = nodeGroupStartOffset + startOffsetInChunk + i;
             resultVector->setNull(i, false);
             resultVector->setValue<offset_t>(i, offset);
         }
@@ -182,8 +182,8 @@ public:
         KU_UNREACHABLE;
     }
 
-    void commitColumnChunkOutOfPlace(Transaction*, ChunkState&, bool,
-        const std::vector<common::offset_t>&, ColumnChunk*, common::offset_t) override {
+    void commitColumnChunkOutOfPlace(Transaction*, ChunkState&, bool, const std::vector<offset_t>&,
+        ColumnChunk*, offset_t) override {
         // Note: only updates to rel table can trigger this code path. SERIAL is not supported in
         // rel table yet.
         KU_UNREACHABLE;
@@ -262,18 +262,14 @@ std::unique_ptr<ColumnChunk> Column::flushChunk(const ColumnChunk& chunk, BMFile
 std::unique_ptr<ColumnChunk> Column::flushNonNestedChunk(const ColumnChunk& chunk,
     BMFileHandle& dataFH) {
     KU_ASSERT(chunk.sanityCheck());
-    auto preScanMetadata = chunk.getMetadataToFlush();
-    auto startPageIdx = dataFH.addNewPages(preScanMetadata.numPages);
-    auto hasNullChunk = chunk.getNullChunk();
-    auto flushedChunk = std::make_unique<ColumnChunk>(chunk.getDataType(), 0,
-        chunk.isCompressionEnabled(), hasNullChunk);
+    const auto preScanMetadata = chunk.getMetadataToFlush();
+    const auto startPageIdx = dataFH.addNewPages(preScanMetadata.numPages);
+    auto flushedChunk =
+        ColumnChunkFactory::createColumnChunk(chunk.getDataType(), chunk.isCompressionEnabled(), 0);
     flushedChunk->setMetadata(chunk.flushBuffer(&dataFH, startPageIdx, preScanMetadata));
-    if (hasNullChunk) {
-        const auto nullChunk = chunk.getNullChunk();
-        preScanMetadata = nullChunk->getMetadataToFlush();
-        startPageIdx = dataFH.addNewPages(preScanMetadata.numPages);
-        flushedChunk->getNullChunk()->setMetadata(
-            nullChunk->flushBuffer(&dataFH, startPageIdx, preScanMetadata));
+    flushedChunk->setNumValues(preScanMetadata.numValues);
+    if (chunk.getNullChunk()) {
+        flushNonNestedChunk(*chunk.getNullChunk(), dataFH);
     }
     return flushedChunk;
 }
@@ -300,9 +296,6 @@ void Column::batchLookup(Transaction* transaction, const offset_t* nodeOffsets, 
 void Column::initChunkState(Transaction* transaction, node_group_idx_t nodeGroupIdx,
     ChunkState& readState) {
     if (nullColumn) {
-        if (!readState.nullState) {
-            readState.nullState = std::make_unique<ChunkState>();
-        }
         nullColumn->initChunkState(transaction, nodeGroupIdx, *readState.nullState);
     }
     if (readState.nodeGroupIdx != nodeGroupIdx) {
@@ -318,14 +311,15 @@ void Column::initChunkState(Transaction* transaction, node_group_idx_t nodeGroup
     }
 }
 
-void Column::scan(Transaction* transaction, const ChunkState& state, vector_idx_t vectorIdx,
+void Column::scan(Transaction* transaction, const ChunkState& state, offset_t startOffsetInChunk,
     row_idx_t numValuesToScan, ValueVector* nodeIDVector, ValueVector* resultVector) {
     if (nullColumn) {
         KU_ASSERT(state.nullState);
-        nullColumn->scan(transaction, *state.nullState, vectorIdx, numValuesToScan, nodeIDVector,
-            resultVector);
+        nullColumn->scan(transaction, *state.nullState, startOffsetInChunk, numValuesToScan,
+            nodeIDVector, resultVector);
     }
-    scanInternal(transaction, state, vectorIdx, numValuesToScan, nodeIDVector, resultVector);
+    scanInternal(transaction, state, startOffsetInChunk, numValuesToScan, nodeIDVector,
+        resultVector);
 }
 
 void Column::scan(Transaction* transaction, const ChunkState& state, offset_t startOffsetInGroup,
@@ -402,9 +396,9 @@ void Column::scan(Transaction* transaction, const ChunkState& state, offset_t st
     }
 }
 
-void Column::scanInternal(Transaction* transaction, const ChunkState& state, vector_idx_t vectorIdx,
-    row_idx_t numValuesToScan, ValueVector* nodeIDVector, ValueVector* resultVector) {
-    const auto startOffsetInChunk = vectorIdx * DEFAULT_VECTOR_CAPACITY;
+void Column::scanInternal(Transaction* transaction, const ChunkState& state,
+    offset_t startOffsetInChunk, row_idx_t numValuesToScan, ValueVector* nodeIDVector,
+    ValueVector* resultVector) {
     auto cursor = getPageCursorForOffsetInGroup(startOffsetInChunk, state);
     if (nodeIDVector->state->getSelVector().isUnfiltered()) {
         scanUnfiltered(transaction, cursor, numValuesToScan, resultVector, state.metadata);
@@ -911,6 +905,21 @@ void Column::populateWithDefaultVal(Transaction* transaction,
             columnChunk->setNumValues(chunkMeta.numValues);
             append(columnChunk.get(), state);
         }
+    }
+}
+
+void Column::setMetadataFromChunk(node_group_idx_t nodeGroupIdx, const ColumnChunk& chunk) {
+    metadataDA->resize(nodeGroupIdx + 1);
+    metadataDA->update(nodeGroupIdx, chunk.getFlushedMetadata());
+    if (nullColumn) {
+        nullColumn->setMetadataFromChunk(nodeGroupIdx, *chunk.getNullChunk());
+    }
+}
+
+void Column::setMetadataToChunk(node_group_idx_t nodeGroupIdx, ColumnChunk& chunk) const {
+    chunk.setMetadata(metadataDA->get(nodeGroupIdx, TransactionType::READ_ONLY));
+    if (nullColumn) {
+        nullColumn->setMetadataToChunk(nodeGroupIdx, *chunk.getNullChunk());
     }
 }
 

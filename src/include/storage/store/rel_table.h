@@ -133,7 +133,7 @@ public:
     void prepareCommit(transaction::Transaction* transaction, LocalTable* localTable) override;
     void prepareCommit() override;
     void prepareRollback(LocalTable* localTable) override;
-    void checkpointInMemory() override;
+    void checkpoint() override;
     void rollbackInMemory() override;
 
     RelTableData* getDirectedTableData(common::RelDataDirection direction) const {
@@ -146,6 +146,7 @@ private:
         RelTableData* tableData, RelTableData* reverseTableData,
         common::ValueVector* srcNodeIDVector, RelTableScanState* relDataReadState,
         RelDetachDeleteState* deleteState);
+    void checkpointInMemory() override;
 
 private:
     std::unique_ptr<RelTableData> fwdRelTableData;

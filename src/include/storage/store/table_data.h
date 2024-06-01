@@ -21,7 +21,7 @@ struct TableDataScanState {
     DELETE_COPY_DEFAULT_MOVE(TableDataScanState);
 
     std::vector<common::column_id_t> columnIDs;
-    std::vector<Column::ChunkState> chunkStates;
+    std::vector<ChunkState> chunkStates;
 };
 
 class LocalTableData;
@@ -62,6 +62,8 @@ public:
     virtual void prepareCommit();
 
     virtual common::node_group_idx_t getNumCommittedNodeGroups() const = 0;
+    virtual std::unique_ptr<ChunkedNodeGroup> getCommittedNodeGroup(
+        common::node_group_idx_t nodeGroupIdx) const = 0;
 
 protected:
     TableData(BMFileHandle* dataFH, BMFileHandle* metadataFH,

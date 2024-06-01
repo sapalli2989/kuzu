@@ -83,12 +83,12 @@ void StructColumn::scan(Transaction* transaction, const ChunkState& state,
 }
 
 void StructColumn::scanInternal(Transaction* transaction, const ChunkState& state,
-    vector_idx_t vectorIdx, row_idx_t numValuesToScan, ValueVector* nodeIDVector,
+    offset_t startOffsetInChunk, row_idx_t numValuesToScan, ValueVector* nodeIDVector,
     ValueVector* resultVector) {
     for (auto i = 0u; i < childColumns.size(); i++) {
         const auto fieldVector = StructVector::getFieldVector(resultVector, i).get();
-        childColumns[i]->scan(transaction, state.childrenStates[i], vectorIdx, numValuesToScan,
-            nodeIDVector, fieldVector);
+        childColumns[i]->scan(transaction, state.childrenStates[i], startOffsetInChunk,
+            numValuesToScan, nodeIDVector, fieldVector);
     }
 }
 
@@ -133,6 +133,22 @@ void StructColumn::append(ColumnChunk* columnChunk, ChunkState& state) {
     auto structColumnChunk = static_cast<StructColumnChunk*>(columnChunk);
     for (auto i = 0u; i < childColumns.size(); i++) {
         childColumns[i]->append(&structColumnChunk->getChild(i), state.childrenStates[i]);
+    }
+}
+
+void StructColumn::setMetadataFromChunk(node_group_idx_t nodeGroupIdx, const ColumnChunk& chunk) {
+    Column::setMetadataFromChunk(nodeGroupIdx, chunk);
+    auto& structChunk = chunk.constCast<StructColumnChunk>();
+    for (auto i = 0u; i < childColumns.size(); i++) {
+        childColumns[i]->setMetadataFromChunk(nodeGroupIdx, structChunk.getChild(i));
+    }
+}
+
+void StructColumn::setMetadataToChunk(node_group_idx_t nodeGroupIdx, ColumnChunk& chunk) const {
+    Column::setMetadataToChunk(nodeGroupIdx, chunk);
+    auto& structChunk = chunk.cast<StructColumnChunk>();
+    for (auto i = 0u; i < childColumns.size(); i++) {
+        childColumns[i]->setMetadataToChunk(nodeGroupIdx, structChunk.getChild(i));
     }
 }
 

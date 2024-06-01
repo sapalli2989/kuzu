@@ -41,7 +41,8 @@ NodeTable::NodeTable(StorageManager* storageManager, NodeTableCatalogEntry* node
         storageManager->getMetadataFH(), nodeTableEntry, bufferManager, wal,
         nodeTableEntry->getPropertiesRef(), storageManager->getNodesStatisticsAndDeletedIDs(),
         storageManager->compressionEnabled());
-    deltaNodeGroups = std::make_unique<NodeGroupCollection>(getTableColumnTypes(*this));
+    deltaNodeGroups = std::make_unique<NodeGroupCollection>(getTableColumnTypes(*this),
+        storageManager->getDataFH(), *tableData);
     initializePKIndex(storageManager->getDatabasePath(), nodeTableEntry,
         storageManager->isReadOnly(), vfs, context);
 }
@@ -65,6 +66,9 @@ void NodeTable::initializeScanState(Transaction* transaction, TableScanState& sc
         // TODO(Guodong): Should we move nodeGroup into nodeGroupScanState?
         nodeScanState.nodeGroup = &deltaNodeGroups->getNodeGroup(scanState.nodeGroupIdx);
         nodeScanState.nodeGroup->initializeScanState(transaction, scanState);
+        for (auto i = 0u; i < scanState.columnIDs.size(); i++) {
+            nodeScanState.columns[i] = tableData->getColumn(scanState.columnIDs[i]);
+        }
     } break;
     case TableScanSource::UNCOMMITTED: {
         scanState.cast<NodeTableScanState>().localNodeTable->initializeScanState(scanState);
@@ -265,8 +269,7 @@ void NodeTable::prepareCommit(Transaction* transaction, LocalTable* localTable) 
     if (pkIndex) {
         pkIndex->prepareCommit();
     }
-    // tableData->prepareCommit();
-    // wal->addToUpdatedTables(tableID);
+    wal->addToUpdatedTables(tableID);
 }
 
 void NodeTable::prepareCommit() {
@@ -281,6 +284,26 @@ void NodeTable::prepareRollback(LocalTable* localTable) {
         pkIndex->prepareRollback();
     }
     localTable->clear();
+}
+
+void NodeTable::checkpoint() {
+    // 1. Flush the delta node groups to disk.
+    deltaNodeGroups->checkpoint();
+    // 2. Update metadata disk arrays.
+    const auto numNodeGroups = deltaNodeGroups->getNumNodeGroups();
+    for (auto nodeGroupIdx = 0u; nodeGroupIdx < numNodeGroups; nodeGroupIdx++) {
+        auto& nodeGroup = deltaNodeGroups->getNodeGroup(nodeGroupIdx);
+        KU_ASSERT(
+            nodeGroup.getNumChunkedGroups() == 1 && nodeGroup.getType() == NodeGroupType::ON_DISK);
+        auto& chunkedGroup = nodeGroup.getChunkedGroup(0);
+        for (auto columnID = 0u; columnID < chunkedGroup.getNumColumns(); columnID++) {
+            tableData->getColumn(columnID)->setMetadataFromChunk(nodeGroupIdx,
+                chunkedGroup.getColumnChunk(columnID));
+        }
+    }
+    // 3. Should also update table statistics.
+    tablesStatistics->updateNumTuplesByValue(tableID, deltaNodeGroups->getNumRows());
+    checkpointInMemory();
 }
 
 void NodeTable::checkpointInMemory() {

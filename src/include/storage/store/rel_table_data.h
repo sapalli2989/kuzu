@@ -45,8 +45,8 @@ struct CSRHeaderColumns {
         offset->scan(transaction, nodeGroupIdx, chunks.offset.get());
         length->scan(transaction, nodeGroupIdx, chunks.length.get());
     }
-    void append(const ChunkedCSRHeader& headerChunks, Column::ChunkState& offsetState,
-        Column::ChunkState& lengthState) const {
+    void append(const ChunkedCSRHeader& headerChunks, ChunkState& offsetState,
+        ChunkState& lengthState) const {
         offset->append(headerChunks.offset.get(), offsetState);
         length->append(headerChunks.length.get(), lengthState);
     }
@@ -168,6 +168,10 @@ public:
 
     common::node_group_idx_t getNumCommittedNodeGroups() const override {
         return columns[NBR_ID_COLUMN_ID]->getNumCommittedNodeGroups();
+    }
+    std::unique_ptr<ChunkedNodeGroup> getCommittedNodeGroup(
+        common::node_group_idx_t nodeGroupIdx) const override {
+        KU_UNREACHABLE;
     }
 
 private:

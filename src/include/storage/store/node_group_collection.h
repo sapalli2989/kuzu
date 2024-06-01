@@ -7,10 +7,13 @@
 namespace kuzu {
 namespace storage {
 
+class TableData;
+
 class NodeGroupCollection {
 public:
     NodeGroupCollection() = default;
-    explicit NodeGroupCollection(const std::vector<common::LogicalType>& types) : types{types} {}
+    explicit NodeGroupCollection(const std::vector<common::LogicalType>& types,
+        BMFileHandle* dataFH, const TableData& tableData);
 
     void append(const ChunkedNodeGroupCollection& chunkedGroupCollection);
     common::row_idx_t getNumRows();
@@ -32,6 +35,8 @@ public:
     // TODO(Guodong): Rename to `mergeAndFlushWhenFull`.
     void merge(transaction::Transaction* transaction, common::node_group_idx_t nodeGroupIdx,
         const ChunkedNodeGroup& chunkedGroup);
+
+    void checkpoint();
 
 private:
     std::shared_mutex mtx;

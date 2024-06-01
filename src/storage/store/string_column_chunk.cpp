@@ -64,6 +64,14 @@ void StringColumnChunk::lookup(offset_t offsetInChunk, ValueVector& output,
     output.setValue<std::string_view>(posInOutputVector, str);
 }
 
+void StringColumnChunk::initializeScanState(ChunkState& state) const {
+    ColumnChunk::initializeScanState(state);
+    dictionaryChunk->getOffsetChunk()->initializeScanState(
+        state.childrenStates[DictionaryChunk::OFFSET_COLUMN_CHILD_READ_STATE_IDX]);
+    dictionaryChunk->getStringDataChunk()->initializeScanState(
+        state.childrenStates[DictionaryChunk::DATA_COLUMN_CHILD_READ_STATE_IDX]);
+}
+
 void StringColumnChunk::write(ValueVector* vector, offset_t offsetInVector,
     offset_t offsetInChunk) {
     KU_ASSERT(vector->dataType.getPhysicalType() == PhysicalTypeID::STRING);

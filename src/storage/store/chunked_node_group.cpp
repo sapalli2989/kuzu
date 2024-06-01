@@ -64,7 +64,7 @@ ChunkedNodeGroup::ChunkedNodeGroup(const std::vector<std::unique_ptr<Column>>& c
     chunks.reserve(columns.size());
     for (auto columnID = 0u; columnID < columns.size(); columnID++) {
         chunks.push_back(ColumnChunkFactory::createColumnChunk(
-            *columns[columnID]->getDataType().copy(), enableCompression));
+            *columns[columnID]->getDataType().copy(), enableCompression, capacity));
     }
 }
 
@@ -176,7 +176,7 @@ std::unique_ptr<ChunkedNodeGroup> ChunkedNodeGroup::flush(BMFileHandle& dataFH) 
     for (auto i = 0u; i < getNumColumns(); i++) {
         flushedChunks[i] = Column::flushChunk(getColumnChunk(i), dataFH);
     }
-    return std::make_unique<ChunkedNodeGroup>(std::move(flushedChunks));
+    return std::make_unique<ChunkedNodeGroup>(std::move(flushedChunks), 0 /*startNodeOffset*/);
 }
 
 ChunkedCSRHeader::ChunkedCSRHeader(bool enableCompression, uint64_t capacity) {

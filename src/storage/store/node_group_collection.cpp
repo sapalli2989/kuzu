@@ -2,12 +2,26 @@
 
 #include <storage/buffer_manager/bm_file_handle.h>
 #include <storage/store/column.h>
+#include <storage/store/table_data.h>
 
 using namespace kuzu::common;
 using namespace kuzu::transaction;
 
 namespace kuzu {
 namespace storage {
+
+NodeGroupCollection::NodeGroupCollection(const std::vector<LogicalType>& types,
+    BMFileHandle* dataFH, const TableData& tableData)
+    : types{types}, dataFH{dataFH} {
+    auto numNodeGroups = tableData.getNumCommittedNodeGroups();
+    nodeGroups.reserve(numNodeGroups);
+    for (auto nodeGroupIdx = 0u; nodeGroupIdx < numNodeGroups; nodeGroupIdx++) {
+        auto nodeGroup = std::make_unique<NodeGroup>(nodeGroupIdx, types);
+        auto chunkedGroup = tableData.getCommittedNodeGroup(nodeGroupIdx);
+        nodeGroup->merge(&DUMMY_WRITE_TRANSACTION, std::move(chunkedGroup));
+        nodeGroups.push_back(std::move(nodeGroup));
+    }
+}
 
 void NodeGroupCollection::append(const ChunkedNodeGroupCollection& chunkedGroupCollection) {
     std::unique_lock xLck{mtx};
@@ -19,6 +33,9 @@ void NodeGroupCollection::append(const ChunkedNodeGroupCollection& chunkedGroupC
     while (numRowsAppended < numRowsToAppend) {
         if (nodeGroups.back()->isFull()) {
             // TODO: Should flush the node group to disk.
+            if (dataFH) {
+                nodeGroups.back()->flush(*dataFH);
+            }
             nodeGroups.push_back(std::make_unique<NodeGroup>(nodeGroups.size(), types));
         }
         const auto& lastNodeGroup = nodeGroups.back();
@@ -51,7 +68,7 @@ void NodeGroupCollection::merge(Transaction* transaction, node_group_idx_t nodeG
         // Flush chunks to disk.
         auto flushedChunkedGroup = chunkedGroup.flush(*dataFH);
         auto flushedNodeGroup = std::make_unique<NodeGroup>(nodeGroupIdx, types);
-        flushedNodeGroup->append(transaction, std::move(flushedChunkedGroup));
+        flushedNodeGroup->merge(transaction, std::move(flushedChunkedGroup));
         {
             std::unique_lock xLck{mtx};
             KU_ASSERT(nodeGroups[nodeGroupIdx]->getNumRows() == 0);
@@ -64,6 +81,15 @@ void NodeGroupCollection::merge(Transaction* transaction, node_group_idx_t nodeG
         if (nodeGroup.isFull()) {
             nodeGroup.flush(*dataFH);
         }
+    }
+}
+
+void NodeGroupCollection::checkpoint() {
+    KU_ASSERT(dataFH);
+    std::unique_lock xLck{mtx};
+    for (auto& nodeGroup : nodeGroups) {
+        if (nodeGroup->getType() == NodeGroupType::IN_MEMORY)
+            nodeGroup->flush(*dataFH);
     }
 }
 

@@ -48,7 +48,8 @@ public:
     common::node_group_idx_t getNumCommittedNodeGroups() const override {
         return columns[0]->getNumCommittedNodeGroups();
     }
-
+    std::unique_ptr<ChunkedNodeGroup> getCommittedNodeGroup(
+        common::node_group_idx_t nodeGroupIdx) const override;
     // common::node_group_idx_t getNumNodeGroups(const transaction::Transaction* transaction) const
     // {
     //     return columns[0]->getNumNodeGroups(transaction);
